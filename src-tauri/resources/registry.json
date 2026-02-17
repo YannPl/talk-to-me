@@ -1,0 +1,148 @@
+{
+  "models": [
+    {
+      "id": "openai/whisper-small",
+      "name": "Whisper Small",
+      "description": "Fast, decent accuracy. Good starting point.",
+      "capability": "speech_to_text",
+      "engine": "whisper_cpp",
+      "languages": ["multi"],
+      "files": [
+        {
+          "filename": "ggml-small.bin",
+          "hf_repo": "ggerganov/whisper.cpp",
+          "size_bytes": 487601967
+        }
+      ]
+    },
+    {
+      "id": "openai/whisper-medium",
+      "name": "Whisper Medium",
+      "description": "Multilingual, good balance of speed and accuracy.",
+      "capability": "speech_to_text",
+      "engine": "whisper_cpp",
+      "languages": ["multi"],
+      "files": [
+        {
+          "filename": "ggml-medium.bin",
+          "hf_repo": "ggerganov/whisper.cpp",
+          "size_bytes": 1533763059
+        }
+      ]
+    },
+    {
+      "id": "openai/whisper-large-v3-turbo",
+      "name": "Whisper Large v3 Turbo",
+      "description": "Multilingual, best quality Whisper variant.",
+      "capability": "speech_to_text",
+      "engine": "whisper_cpp",
+      "languages": ["multi"],
+      "files": [
+        {
+          "filename": "ggml-large-v3-turbo.bin",
+          "hf_repo": "ggerganov/whisper.cpp",
+          "size_bytes": 1624555275
+        }
+      ]
+    },
+    {
+      "id": "distil-whisper/distil-large-v3",
+      "name": "Distil-Whisper Large v3",
+      "description": "Distilled, 6x faster than Whisper Large.",
+      "capability": "speech_to_text",
+      "engine": "whisper_cpp",
+      "languages": ["en"],
+      "files": [
+        {
+          "filename": "ggml-distil-large-v3.bin",
+          "hf_repo": "distil-whisper/distil-large-v3-ggml",
+          "size_bytes": 1519521155
+        }
+      ]
+    },
+    {
+      "id": "nvidia/parakeet-ctc-0.6b",
+      "name": "Parakeet CTC 0.6B",
+      "description": "Excellent English accuracy, fast ONNX inference.",
+      "capability": "speech_to_text",
+      "engine": "onnx",
+      "languages": ["en"],
+      "files": [
+        {
+          "filename": "model.onnx",
+          "hf_repo": "istupakov/parakeet-ctc-0.6b-onnx",
+          "size_bytes": 41837729
+        },
+        {
+          "filename": "model.onnx.data",
+          "hf_repo": "istupakov/parakeet-ctc-0.6b-onnx",
+          "size_bytes": 2435002372
+        },
+        {
+          "filename": "vocab.txt",
+          "hf_repo": "istupakov/parakeet-ctc-0.6b-onnx",
+          "size_bytes": 10374
+        }
+      ],
+      "preprocessing": {
+        "sample_rate": 16000,
+        "feature_type": "mel_spectrogram",
+        "n_mels": 80
+      }
+    },
+    {
+      "id": "nvidia/parakeet-tdt-0.6b-v3",
+      "name": "Parakeet TDT 0.6B v3",
+      "description": "Multilingual (25 languages incl. French), excellent accuracy.",
+      "capability": "speech_to_text",
+      "engine": "onnx",
+      "languages": ["multi"],
+      "files": [
+        {
+          "filename": "encoder-model.onnx",
+          "hf_repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+          "size_bytes": 41770866
+        },
+        {
+          "filename": "encoder-model.onnx.data",
+          "hf_repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+          "size_bytes": 2435420160
+        },
+        {
+          "filename": "decoder_joint-model.onnx",
+          "hf_repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+          "size_bytes": 72520893
+        },
+        {
+          "filename": "vocab.txt",
+          "hf_repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+          "size_bytes": 93939
+        }
+      ],
+      "preprocessing": {
+        "sample_rate": 16000,
+        "feature_type": "mel_spectrogram",
+        "n_mels": 128
+      }
+    },
+    {
+      "id": "rhasspy/piper-voices",
+      "name": "Piper FR Medium",
+      "description": "Natural French voice, very lightweight.",
+      "capability": "text_to_speech",
+      "engine": "onnx",
+      "languages": ["fr"],
+      "available_from_version": "2.0",
+      "files": [
+        {
+          "filename": "fr_FR-siwis-medium.onnx",
+          "size_bytes": 80000000
+        },
+        {
+          "filename": "fr_FR-siwis-medium.onnx.json",
+          "size_bytes": 5000
+        }
+      ]
+    }
+  ]
+}

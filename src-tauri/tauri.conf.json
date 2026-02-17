@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "talk-to-me",
+  "productName": "Talk to Me",
   "version": "0.1.0",
   "identifier": "com.yannpl.ttm",
   "build": {
@@ -10,13 +10,20 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "talk-to-me",
-        "width": 800,
-        "height": 600
+        "label": "main",
+        "title": "Talk to Me — Settings",
+        "width": 550,
+        "height": 450,
+        "resizable": true,
+        "visible": false
       }
     ],
     "security": {
       "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/tray-icon.png",
+      "iconAsTemplate": true
     }
   },
   "bundle": {
@@ -28,6 +35,10 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "entitlements": null,
+      "minimumSystemVersion": "13.0"
+    }
   }
 }

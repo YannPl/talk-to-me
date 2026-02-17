@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talk to Me — Overlay</title>
+    <link rel="stylesheet" href="styles/overlay.css">
+</head>
+<body>
+    <div class="overlay" id="overlay">
+        <!-- STT mode -->
+        <div class="overlay-content" id="mode-stt">
+            <div class="status-row">
+                <span class="recording-dot"></span>
+                <span class="status-text" id="stt-status">Listening...</span>
+                <span class="shortcut-hint">&#x2325;Space</span>
+            </div>
+            <div class="visualizer" id="audio-visualizer">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </div>
+        </div>
+
+        <!-- Transcription in progress -->
+        <div class="overlay-content hidden" id="mode-transcribing">
+            <div class="status-row">
+                <span class="spinner"></span>
+                <span class="status-text">Transcribing...</span>
+            </div>
+            <div class="progress-bar-mini">
+                <div class="progress-fill-mini" id="transcription-progress"></div>
+            </div>
+        </div>
+
+        <!-- TTS mode (future) -->
+        <div class="overlay-content hidden" id="mode-tts">
+            <div class="status-row">
+                <span class="playback-icon">&#x1F50A;</span>
+                <span class="status-text">Reading...</span>
+                <span class="shortcut-hint">&#x2325;&#x21E7;Space</span>
+            </div>
+            <div class="progress-bar-mini">
+                <div class="progress-fill-mini tts" id="tts-progress"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="scripts/overlay.js"></script>
+</body>
+</html>

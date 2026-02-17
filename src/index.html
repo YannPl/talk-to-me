@@ -1,39 +1,131 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="stylesheet" href="styles.css" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tauri App</title>
-    <script type="module" src="/main.js" defer></script>
-  </head>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talk to Me — Settings</title>
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <div class="settings-container">
+        <!-- Tab bar -->
+        <nav class="tab-bar">
+            <button class="tab active" data-tab="general">General</button>
+            <button class="tab" data-tab="models">Models</button>
+        </nav>
 
-  <body>
-    <main class="container">
-      <h1>Welcome to Tauri</h1>
+        <!-- General tab -->
+        <section id="tab-general" class="tab-content active">
+            <div class="setting-group">
+                <h3>Keyboard Shortcuts</h3>
+                <div class="setting-row">
+                    <label>Dictation (STT)</label>
+                    <div class="shortcut-capture" id="stt-shortcut" tabindex="0">&#x2325;Space</div>
+                </div>
+                <div class="setting-row disabled">
+                    <label>Read aloud (TTS) <span class="badge-future">Coming soon</span></label>
+                    <div class="shortcut-capture disabled">&#x2325;&#x21E7;Space</div>
+                </div>
+            </div>
 
-      <div class="row">
-        <a href="https://tauri.app" target="_blank">
-          <img src="/assets/tauri.svg" class="logo tauri" alt="Tauri logo" />
-        </a>
-        <a
-          href="https://developer.mozilla.org/en-US/docs/Web/JavaScript"
-          target="_blank"
-        >
-          <img
-            src="/assets/javascript.svg"
-            class="logo vanilla"
-            alt="JavaScript logo"
-          />
-        </a>
-      </div>
-      <p>Click on the Tauri logo to learn more about the framework</p>
+            <div class="setting-group">
+                <h3>Transcription Language</h3>
+                <div class="setting-row">
+                    <label>Language</label>
+                    <select id="language-select">
+                        <option value="auto">Auto-detect</option>
+                        <option value="en">English</option>
+                        <option value="fr">French</option>
+                        <option value="de">German</option>
+                        <option value="es">Spanish</option>
+                        <option value="it">Italian</option>
+                        <option value="pt">Portuguese</option>
+                        <option value="ja">Japanese</option>
+                        <option value="zh">Chinese</option>
+                    </select>
+                </div>
+            </div>
 
-      <form class="row" id="greet-form">
-        <input id="greet-input" placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
-      </form>
-      <p id="greet-msg"></p>
-    </main>
-  </body>
+            <div class="setting-group">
+                <h3>After Transcription</h3>
+                <div class="setting-row">
+                    <label>Injection mode</label>
+                    <select id="injection-mode">
+                        <option value="clipboard">Paste via clipboard (&#x2318;V)</option>
+                        <option value="keystroke">Simulate keystrokes</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <h3>General</h3>
+                <div class="setting-row">
+                    <label>Launch at login</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="launch-at-login">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div class="setting-row">
+                    <label>Sound feedback</label>
+                    <label class="toggle">
+                        <input type="checkbox" id="sound-feedback" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <h3>Accessibility</h3>
+                <div class="setting-row">
+                    <span id="accessibility-status" class="status-indicator">Checking...</span>
+                    <button id="request-accessibility" class="btn-secondary" style="display:none;">Grant Permission</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Models tab -->
+        <section id="tab-models" class="tab-content">
+            <!-- Category filter -->
+            <div class="category-filter">
+                <button class="category-btn active" data-capability="stt">&#x1F399; Dictation (STT)</button>
+                <button class="category-btn disabled" data-capability="tts">&#x1F50A; Read aloud (TTS) <span class="badge-future">Soon</span></button>
+            </div>
+
+            <!-- Installed models -->
+            <div class="models-section">
+                <h3>Installed Models</h3>
+                <div id="installed-models" class="model-list">
+                    <p class="empty-state">No models installed. Download one below to get started.</p>
+                </div>
+            </div>
+
+            <!-- Catalog -->
+            <div class="models-section">
+                <h3>Download a Model</h3>
+                <div id="model-catalog" class="model-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Download progress (hidden by default) -->
+            <div id="download-progress" class="download-bar" style="display:none;">
+                <div class="download-info">
+                    <span id="download-model-name">Downloading...</span>
+                    <span id="download-stats"></span>
+                </div>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+                <button id="cancel-download" class="btn-icon" title="Cancel">&#x2715;</button>
+            </div>
+        </section>
+    </div>
+
+    <div class="footer">
+        <span id="app-version">Talk to Me v0.1.0</span>
+    </div>
+
+    <script type="module" src="scripts/app.js"></script>
+</body>
 </html>
