@@ -4,10 +4,8 @@ use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 use crate::engine::AudioBuffer;
 
-/// Target sample rate for STT models
 const TARGET_SAMPLE_RATE: u32 = 16000;
 
-/// Audio capture from microphone
 pub struct AudioCapture {
     samples: Arc<Mutex<Vec<f32>>>,
     is_recording: Arc<AtomicBool>,
@@ -31,7 +29,6 @@ impl AudioCapture {
         })
     }
 
-    /// Start recording from default input device
     pub fn start(&mut self) -> Result<()> {
         let host = cpal::default_host();
         let device = host.default_input_device()
@@ -45,7 +42,6 @@ impl AudioCapture {
         let samples = Arc::clone(&self.samples);
         let is_recording = Arc::clone(&self.is_recording);
 
-        // Clear previous samples
         samples.lock().unwrap().clear();
         is_recording.store(true, Ordering::SeqCst);
 
@@ -56,7 +52,6 @@ impl AudioCapture {
             &stream_config,
             move |data: &[f32], _: &cpal::InputCallbackInfo| {
                 if is_recording.load(Ordering::SeqCst) {
-                    // Take only the first channel (mono)
                     let mono: Vec<f32> = data.iter().step_by(channels).copied().collect();
                     samples.lock().unwrap().extend_from_slice(&mono);
                 }
@@ -74,11 +69,9 @@ impl AudioCapture {
         Ok(())
     }
 
-    /// Stop recording and return the captured audio buffer
     pub fn stop(&mut self) -> Result<AudioBuffer> {
         self.is_recording.store(false, Ordering::SeqCst);
 
-        // Drop the stream to stop capture
         self.stream = None;
 
         let raw_samples = {
@@ -88,7 +81,6 @@ impl AudioCapture {
 
         tracing::info!("Audio capture stopped: {} samples at {}Hz", raw_samples.len(), self.device_sample_rate);
 
-        // Resample to target rate if necessary
         let (samples, sample_rate) = if self.device_sample_rate != TARGET_SAMPLE_RATE {
             let resampled = super::processing::resample(
                 &raw_samples,
@@ -107,7 +99,6 @@ impl AudioCapture {
         })
     }
 
-    /// Get current audio level (0.0 - 1.0) for visualization
     pub fn current_level(&self) -> f32 {
         let guard = self.samples.lock().unwrap();
         if guard.is_empty() {

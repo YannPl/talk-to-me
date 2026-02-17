@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager};
 use crate::hub::registry::{self, CatalogModel, InstalledModel};
 use crate::engine::{Engine, ModelCapability};
@@ -46,21 +48,47 @@ pub async fn download_model(app_handle: AppHandle, model_id: String) -> Result<(
 
     let total_size: u64 = model.files.iter().map(|f| f.size_bytes).sum();
 
-    for file in &model.files {
-        let hf_repo = file.hf_repo.as_deref().unwrap_or(&model_id);
-        let url = crate::hub::api::download_url(hf_repo, &file.filename);
-        let dest = model_dir.join(&file.filename);
-
-        crate::hub::download::download_file(
-            &app_handle,
-            &model_id,
-            &url,
-            &dest,
-            file.size_bytes,
-        ).await.map_err(|e| e.to_string())?;
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    {
+        let state = app_handle.state::<crate::state::AppState>();
+        state.download_cancels.lock().unwrap()
+            .insert(model_id.clone(), cancel_flag.clone());
     }
 
-    // Register in installed.json
+    let result = async {
+        for file in &model.files {
+            let hf_repo = file.hf_repo.as_deref().unwrap_or(&model_id);
+            let url = crate::hub::api::download_url(hf_repo, &file.filename);
+            let local_name = file.local_filename.as_deref().unwrap_or(&file.filename);
+            let dest = model_dir.join(local_name);
+
+            crate::hub::download::download_file(
+                &app_handle,
+                &model_id,
+                &url,
+                &dest,
+                file.size_bytes,
+                &cancel_flag,
+            ).await.map_err(|e| e.to_string())?;
+        }
+        Ok::<(), String>(())
+    }.await;
+
+    {
+        let state = app_handle.state::<crate::state::AppState>();
+        state.download_cancels.lock().unwrap().remove(&model_id);
+    }
+
+    if let Err(ref e) = result {
+        if e.contains("cancelled") {
+            tracing::info!("Cleaning up cancelled download: {}", model_id);
+            let _ = std::fs::remove_dir_all(&model_dir);
+            return Err("cancelled".to_string());
+        }
+    }
+
+    result?;
+
     let installed = InstalledModel {
         id: model_id.clone(),
         name: model.name.clone(),
@@ -74,12 +102,12 @@ pub async fn download_model(app_handle: AppHandle, model_id: String) -> Result<(
 
     tracing::info!("Model installed: {} at {}", model_id, model_dir.display());
 
-    // Auto-activate if it's the first STT model
     if model.capability == ModelCapability::SpeechToText {
         let state = app_handle.state::<crate::state::AppState>();
         let current_active = state.settings.lock().unwrap().stt.active_model_id.clone();
         if current_active.is_none() {
             load_stt_engine(&app_handle, &model_id).map_err(|e| e.to_string())?;
+            crate::persistence::save_settings(&app_handle);
         }
     }
 
@@ -87,21 +115,51 @@ pub async fn download_model(app_handle: AppHandle, model_id: String) -> Result<(
 }
 
 #[tauri::command]
-pub fn delete_model(model_id: String) -> Result<(), String> {
+pub fn cancel_download(app_handle: AppHandle, model_id: String) -> Result<(), String> {
+    let state = app_handle.state::<crate::state::AppState>();
+    let cancels = state.download_cancels.lock().unwrap();
+    if let Some(flag) = cancels.get(&model_id) {
+        (**flag).store(true, Ordering::Relaxed);
+        tracing::info!("Cancellation requested for: {}", model_id);
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_model(app_handle: AppHandle, model_id: String) -> Result<(), String> {
+    let mut settings_changed = false;
+    {
+        let state = app_handle.state::<crate::state::AppState>();
+        let mut settings = state.settings.lock().unwrap();
+        if settings.stt.active_model_id.as_deref() == Some(&model_id) {
+            *state.active_stt_engine.lock().unwrap() = None;
+            settings.stt.active_model_id = None;
+            settings_changed = true;
+            tracing::info!("Unloaded active STT engine before deleting model: {}", model_id);
+        }
+        if settings.tts.active_model_id.as_deref() == Some(&model_id) {
+            *state.active_tts_engine.lock().unwrap() = None;
+            settings.tts.active_model_id = None;
+            settings_changed = true;
+        }
+    }
+
     let models_dir = registry::models_dir().map_err(|e| e.to_string())?;
     let model_slug = model_id.replace('/', "--");
 
-    // Try both stt and tts directories
     for cap_dir in &["stt", "tts"] {
         let path = models_dir.join(cap_dir).join(&model_slug);
         if path.exists() {
             std::fs::remove_dir_all(&path).map_err(|e| e.to_string())?;
-            tracing::info!("Deleted model: {}", path.display());
+            tracing::info!("Deleted model directory: {}", path.display());
         }
     }
 
-    // Remove from installed.json
     registry::remove_installed_model(&model_id).map_err(|e| e.to_string())?;
+
+    if settings_changed {
+        crate::persistence::save_settings(&app_handle);
+    }
 
     Ok(())
 }
@@ -116,6 +174,7 @@ pub fn set_active_model(app_handle: AppHandle, model_id: String, capability: Str
         }
         _ => return Err("Invalid capability".into()),
     }
+    crate::persistence::save_settings(&app_handle);
 
     Ok(())
 }
@@ -132,9 +191,7 @@ pub fn get_active_model(app_handle: AppHandle, capability: String) -> Result<Opt
     })
 }
 
-/// Load an STT engine for the given model and set it as active.
-/// Supports both WhisperCpp (.bin) and ONNX (Parakeet) engines.
-fn load_stt_engine(app_handle: &AppHandle, model_id: &str) -> anyhow::Result<()> {
+pub(crate) fn load_stt_engine(app_handle: &AppHandle, model_id: &str) -> anyhow::Result<()> {
     use crate::engine::{self, ModelInfo, EngineType, SttEngine};
 
     let installed = registry::list_installed_models(Some(&ModelCapability::SpeechToText))?;
@@ -155,7 +212,6 @@ fn load_stt_engine(app_handle: &AppHandle, model_id: &str) -> anyhow::Result<()>
 
     let engine: Box<dyn SttEngine> = match model.engine {
         EngineType::WhisperCpp => {
-            // Find the .bin model file
             let model_file = std::fs::read_dir(&model_dir)?
                 .filter_map(|e| e.ok())
                 .find(|e| {
@@ -171,7 +227,6 @@ fn load_stt_engine(app_handle: &AppHandle, model_id: &str) -> anyhow::Result<()>
             Box::new(eng)
         }
         EngineType::Onnx => {
-            // ONNX engine loads from model directory (model.onnx + tokenizer.json)
             let mut eng = engine::onnx_stt::OnnxSttEngine::new();
             eng.load_model(&model_dir, &info)?;
             tracing::info!("ONNX STT engine loaded: {} from {}", model_id, model_dir.display());
@@ -187,7 +242,6 @@ fn load_stt_engine(app_handle: &AppHandle, model_id: &str) -> anyhow::Result<()>
 }
 
 fn chrono_now() -> String {
-    // Simple ISO-ish timestamp without chrono dependency
     let dur = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();

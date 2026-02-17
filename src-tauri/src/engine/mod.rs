@@ -6,7 +6,6 @@ use std::path::Path;
 use anyhow::Result;
 use serde::{Serialize, Deserialize};
 
-/// Model capability direction
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ModelCapability {
@@ -14,7 +13,6 @@ pub enum ModelCapability {
     TextToSpeech,
 }
 
-/// Engine runtime type
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EngineType {
@@ -22,7 +20,6 @@ pub enum EngineType {
     Onnx,
 }
 
-/// Model metadata, independent of runtime
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelInfo {
     pub id: String,
@@ -33,7 +30,6 @@ pub struct ModelInfo {
     pub size_bytes: u64,
 }
 
-/// Audio buffer for passing audio data between modules
 #[derive(Debug, Clone)]
 pub struct AudioBuffer {
     pub samples: Vec<f32>,
@@ -41,7 +37,6 @@ pub struct AudioBuffer {
     pub channels: u16,
 }
 
-/// Transcription result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TranscriptionResult {
     pub text: String,
@@ -50,7 +45,6 @@ pub struct TranscriptionResult {
     pub segments: Option<Vec<Segment>>,
 }
 
-/// A timed segment of transcription
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Segment {
     pub start_ms: u64,
@@ -58,7 +52,6 @@ pub struct Segment {
     pub text: String,
 }
 
-/// TTS synthesis options (future)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TtsOptions {
     pub language: String,
@@ -66,7 +59,6 @@ pub struct TtsOptions {
     pub voice_id: Option<String>,
 }
 
-/// Base engine trait — load/unload models
 pub trait Engine: Send + Sync {
     fn load_model(&mut self, model_path: &Path, info: &ModelInfo) -> Result<()>;
     fn unload_model(&mut self) -> Result<()>;
@@ -74,17 +66,14 @@ pub trait Engine: Send + Sync {
     fn capability(&self) -> ModelCapability;
 }
 
-/// STT specialization: audio -> text
 pub trait SttEngine: Engine {
     fn transcribe(&self, audio: &AudioBuffer) -> Result<TranscriptionResult>;
 }
 
-/// TTS specialization: text -> audio (future)
 pub trait TtsEngine: Engine {
     fn synthesize(&self, text: &str, options: &TtsOptions) -> Result<AudioBuffer>;
 }
 
-/// Factory to create the right engine based on type and capability
 pub fn create_engine(engine_type: &EngineType, capability: &ModelCapability) -> Result<Box<dyn Engine>> {
     match (engine_type, capability) {
         (EngineType::WhisperCpp, ModelCapability::SpeechToText) => {

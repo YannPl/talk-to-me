@@ -4,7 +4,6 @@ use serde::Deserialize;
 const HF_API_BASE: &str = "https://huggingface.co/api/models";
 const HF_DOWNLOAD_BASE: &str = "https://huggingface.co";
 
-/// Model metadata from HuggingFace API
 #[derive(Debug, Deserialize)]
 pub struct HfModelInfo {
     pub id: String,
@@ -21,7 +20,6 @@ pub struct HfFileSibling {
     pub size: Option<u64>,
 }
 
-/// Fetch model metadata from HuggingFace
 pub async fn fetch_model_info(model_id: &str) -> Result<HfModelInfo> {
     let url = format!("{}/{}", HF_API_BASE, model_id);
     let client = reqwest::Client::new();
@@ -35,7 +33,6 @@ pub async fn fetch_model_info(model_id: &str) -> Result<HfModelInfo> {
     Ok(info)
 }
 
-/// Build the download URL for a specific file in a model repo
 pub fn download_url(model_id: &str, filename: &str) -> String {
     format!("{}/{}/resolve/main/{}", HF_DOWNLOAD_BASE, model_id, filename)
 }

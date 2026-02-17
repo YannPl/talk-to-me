@@ -2,7 +2,6 @@ use anyhow::Result;
 use serde::{Serialize, Deserialize};
 use crate::engine::{ModelCapability, EngineType};
 
-/// A model entry in the catalog
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatalogModel {
     pub id: String,
@@ -14,7 +13,6 @@ pub struct CatalogModel {
     pub files: Vec<ModelFile>,
     #[serde(default)]
     pub preprocessing: Option<PreprocessingConfig>,
-    /// If set, model is only available from this version onward
     #[serde(default)]
     pub available_from_version: Option<String>,
 }
@@ -23,9 +21,10 @@ pub struct CatalogModel {
 pub struct ModelFile {
     pub filename: String,
     pub size_bytes: u64,
-    /// Override HuggingFace repo (if different from model id)
     #[serde(default)]
     pub hf_repo: Option<String>,
+    #[serde(default)]
+    pub local_filename: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,7 +34,6 @@ pub struct PreprocessingConfig {
     pub n_mels: Option<u32>,
 }
 
-/// An installed model on disk
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstalledModel {
     pub id: String,
@@ -47,7 +45,6 @@ pub struct InstalledModel {
     pub size_bytes: u64,
 }
 
-/// Load the built-in model catalog
 pub fn load_catalog() -> Result<Vec<CatalogModel>> {
     let catalog_json = include_str!("../../resources/registry.json");
     let catalog: CatalogContainer = serde_json::from_str(catalog_json)?;
@@ -59,7 +56,6 @@ struct CatalogContainer {
     models: Vec<CatalogModel>,
 }
 
-/// Get the models directory path
 pub fn models_dir() -> Result<std::path::PathBuf> {
     let app_support = dirs::data_dir()
         .ok_or_else(|| anyhow::anyhow!("Cannot find Application Support directory"))?;
@@ -91,7 +87,6 @@ fn write_manifest(models: &[InstalledModel]) -> Result<()> {
     Ok(())
 }
 
-/// List installed models from disk
 pub fn list_installed_models(capability_filter: Option<&ModelCapability>) -> Result<Vec<InstalledModel>> {
     let models = read_manifest()?;
 
@@ -101,17 +96,14 @@ pub fn list_installed_models(capability_filter: Option<&ModelCapability>) -> Res
     })
 }
 
-/// Add a model to the installed manifest
 pub fn add_installed_model(model: &InstalledModel) -> Result<()> {
     let mut models = read_manifest()?;
-    // Remove existing entry with same id (re-download)
     models.retain(|m| m.id != model.id);
     models.push(model.clone());
     write_manifest(&models)?;
     Ok(())
 }
 
-/// Remove a model from the installed manifest
 pub fn remove_installed_model(model_id: &str) -> Result<()> {
     let mut models = read_manifest()?;
     models.retain(|m| m.id != model_id);

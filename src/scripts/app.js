@@ -1,21 +1,26 @@
 import * as api from './api.js';
 
-// Tab switching
+function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    const tabBtn = document.querySelector(`.tab[data-tab="${tabName}"]`);
+    if (tabBtn) tabBtn.classList.add('active');
+    const tabContent = document.getElementById(`tab-${tabName}`);
+    if (tabContent) tabContent.classList.add('active');
+}
+
 document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        tab.classList.add('active');
-        document.getElementById(`tab-${tab.dataset.tab}`).classList.add('active');
-    });
+    tab.addEventListener('click', () => switchTab(tab.dataset.tab));
 });
 
-// Load settings on startup
+api.onNavigateTab((tabName) => switchTab(tabName));
+
 async function loadSettings() {
     try {
         const settings = await api.getSettings();
         document.getElementById('language-select').value = settings.stt.language;
         document.getElementById('injection-mode').value = settings.stt.injection_mode;
+        document.getElementById('recording-mode').value = settings.stt.recording_mode || 'toggle';
         document.getElementById('launch-at-login').checked = settings.general.launch_at_login;
         document.getElementById('sound-feedback').checked = settings.general.sound_feedback;
     } catch (e) {
@@ -23,7 +28,6 @@ async function loadSettings() {
     }
 }
 
-// Save settings on change
 async function saveSettings() {
     try {
         const settings = {
@@ -34,6 +38,7 @@ async function saveSettings() {
             stt: {
                 language: document.getElementById('language-select').value,
                 injection_mode: document.getElementById('injection-mode').value,
+                recording_mode: document.getElementById('recording-mode').value,
                 active_model_id: null, // managed separately
             },
             tts: {
@@ -52,15 +57,13 @@ async function saveSettings() {
     }
 }
 
-// Bind change events to save
-['language-select', 'injection-mode'].forEach(id => {
+['language-select', 'injection-mode', 'recording-mode'].forEach(id => {
     document.getElementById(id).addEventListener('change', saveSettings);
 });
 ['launch-at-login', 'sound-feedback'].forEach(id => {
     document.getElementById(id).addEventListener('change', saveSettings);
 });
 
-// Check accessibility
 async function checkAccessibility() {
     try {
         const granted = await api.checkAccessibilityPermission();
@@ -84,43 +87,80 @@ document.getElementById('request-accessibility')?.addEventListener('click', asyn
     await api.requestAccessibilityPermission();
 });
 
-// Load model catalog
 async function loadCatalog() {
     try {
         const catalog = await api.getCatalog('stt');
+        const installed = await api.listInstalledModels('stt');
+        const installedIds = new Set(installed.map(m => m.id));
         const container = document.getElementById('model-catalog');
         container.innerHTML = '';
 
         for (const model of catalog) {
+            if (installedIds.has(model.id)) continue;
+
             const sizeStr = formatSize(model.files.reduce((sum, f) => sum + f.size_bytes, 0));
             const langStr = model.languages.join(', ');
 
             const card = document.createElement('div');
             card.className = 'model-card';
-            card.innerHTML = `
-                <div class="model-info">
-                    <div class="model-name">${model.name}</div>
-                    <div class="model-desc">${model.description || ''}</div>
-                    <div class="model-meta">
-                        <span class="model-size">${sizeStr}</span>
-                        <span class="model-lang">${langStr}</span>
-                    </div>
+            card.dataset.modelId = model.id;
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'model-info';
+            infoDiv.innerHTML = `
+                <div class="model-name">${model.name}</div>
+                <div class="model-desc">${model.description || ''}</div>
+                <div class="model-meta">
+                    <span class="model-size">${sizeStr}</span>
+                    <span class="model-lang">${langStr}</span>
                 </div>
-                <button class="btn-download" data-model-id="${model.id}">\u2B07 Download</button>
             `;
+
+            const actionDiv = document.createElement('div');
+            actionDiv.className = 'model-action';
+
+            if (activeDownloads.has(model.id)) {
+                actionDiv.classList.add('downloading');
+
+                const progressDiv = document.createElement('div');
+                progressDiv.className = 'inline-progress';
+                progressDiv.innerHTML = `
+                    <div class="inline-progress-bar"><div class="inline-progress-fill"></div></div>
+                    <span class="inline-progress-text">0%</span>
+                `;
+
+                const cancelBtn = document.createElement('button');
+                cancelBtn.className = 'btn-cancel';
+                cancelBtn.title = 'Cancel download';
+                cancelBtn.textContent = '\u2715';
+                cancelBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    cancelDownload(model.id);
+                });
+
+                actionDiv.appendChild(progressDiv);
+                actionDiv.appendChild(cancelBtn);
+            } else {
+                const btn = document.createElement('button');
+                btn.className = 'btn-download';
+                btn.textContent = '\u2B07 Download';
+                btn.addEventListener('click', () => downloadModel(model.id));
+                actionDiv.appendChild(btn);
+            }
+
+            card.appendChild(infoDiv);
+            card.appendChild(actionDiv);
             container.appendChild(card);
         }
 
-        // Bind download buttons
-        container.querySelectorAll('.btn-download').forEach(btn => {
-            btn.addEventListener('click', () => downloadModel(btn.dataset.modelId));
-        });
+        if (container.children.length === 0) {
+            container.innerHTML = '<p class="empty-state">All available models are installed.</p>';
+        }
     } catch (e) {
         console.error('Failed to load catalog:', e);
     }
 }
 
-// Load installed models
 async function loadInstalled() {
     try {
         const models = await api.listInstalledModels('stt');
@@ -137,82 +177,144 @@ async function loadInstalled() {
         for (const model of models) {
             const card = document.createElement('div');
             card.className = 'model-card installed';
-            card.innerHTML = `
-                <div class="model-select">
-                    <input type="radio" name="active-stt" value="${model.id}" ${model.id === activeId ? 'checked' : ''}>
+
+            const selectDiv = document.createElement('div');
+            selectDiv.className = 'model-select';
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'active-stt';
+            radio.value = model.id;
+            radio.checked = model.id === activeId;
+            selectDiv.appendChild(radio);
+
+            const infoDiv = document.createElement('div');
+            infoDiv.className = 'model-info';
+            infoDiv.innerHTML = `
+                <div class="model-name">${model.name}</div>
+                <div class="model-meta">
+                    <span class="model-size">${formatSize(model.size_bytes)}</span>
                 </div>
-                <div class="model-info">
-                    <div class="model-name">${model.name}</div>
-                    <div class="model-meta">
-                        <span class="model-size">${formatSize(model.size_bytes)}</span>
-                    </div>
-                </div>
-                <button class="btn-delete" data-model-id="${model.id}" title="Delete">\uD83D\uDDD1</button>
             `;
-            container.appendChild(card);
-        }
 
-        // Bind radio buttons
-        container.querySelectorAll('input[name="active-stt"]').forEach(radio => {
-            radio.addEventListener('change', () => api.setActiveModel(radio.value, 'stt'));
-        });
-
-        // Bind delete buttons
-        container.querySelectorAll('.btn-delete').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                if (confirm('Delete this model?')) {
-                    await api.deleteModel(btn.dataset.modelId);
-                    loadInstalled();
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'btn-delete';
+            deleteBtn.title = 'Delete';
+            deleteBtn.textContent = '\u2715';
+            deleteBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const confirmed = await showConfirm(`Delete ${model.name}?`);
+                if (!confirmed) return;
+                try {
+                    await api.deleteModel(model.id);
+                    await loadInstalled();
+                    await loadCatalog();
+                } catch (err) {
+                    console.error('Failed to delete model:', err);
                 }
             });
-        });
+
+            radio.addEventListener('change', () => api.setActiveModel(model.id, 'stt'));
+
+            card.appendChild(selectDiv);
+            card.appendChild(infoDiv);
+            card.appendChild(deleteBtn);
+            container.appendChild(card);
+        }
     } catch (e) {
         console.error('Failed to load installed models:', e);
     }
 }
 
-async function downloadModel(modelId) {
-    const progressEl = document.getElementById('download-progress');
-    const nameEl = document.getElementById('download-model-name');
-    const statsEl = document.getElementById('download-stats');
-    const fillEl = document.getElementById('progress-fill');
+const activeDownloads = new Set();
 
-    nameEl.textContent = `Downloading ${modelId}...`;
-    progressEl.style.display = 'flex';
-    fillEl.style.width = '0%';
+async function downloadModel(modelId) {
+    if (activeDownloads.has(modelId)) return; // already downloading
+    activeDownloads.add(modelId);
+
+    await loadCatalog();
 
     try {
         await api.downloadModel(modelId);
-        // Command completed successfully — hide progress and refresh lists
-        progressEl.style.display = 'none';
+        activeDownloads.delete(modelId);
         await loadInstalled();
         await loadCatalog();
     } catch (e) {
-        console.error('Download failed:', e);
-        progressEl.style.display = 'none';
+        activeDownloads.delete(modelId);
+        if (e !== 'cancelled') {
+            console.error('Download failed:', e);
+        }
+        await loadCatalog();
     }
 }
 
-// Download progress listener
+async function cancelDownload(modelId) {
+    try {
+        await api.cancelDownload(modelId);
+    } catch (e) {
+        console.error('Failed to cancel download:', e);
+    }
+}
+
+function updateInlineProgress(modelId, progress, speedBps, etaSeconds) {
+    const card = document.querySelector(`.model-card[data-model-id="${CSS.escape(modelId)}"]`);
+    if (!card) return;
+    const fill = card.querySelector('.inline-progress-fill');
+    const text = card.querySelector('.inline-progress-text');
+    if (fill) fill.style.width = `${(progress * 100).toFixed(1)}%`;
+    if (text) text.textContent = `${(progress * 100).toFixed(0)}% \u2014 ${formatSize(speedBps)}/s`;
+}
+
 api.onDownloadProgress((data) => {
-    const fillEl = document.getElementById('progress-fill');
-    const statsEl = document.getElementById('download-stats');
-    fillEl.style.width = `${(data.progress * 100).toFixed(1)}%`;
-    statsEl.textContent = `${formatSize(data.speed_bps)}/s \u2014 ${formatTime(data.eta_seconds)} remaining`;
+    updateInlineProgress(data.model_id, data.progress, data.speed_bps, data.eta_seconds);
 });
 
-api.onDownloadComplete(() => {
-    document.getElementById('download-progress').style.display = 'none';
+api.onDownloadComplete((data) => {
+    const modelId = data?.model_id;
+    if (modelId) activeDownloads.delete(modelId);
     loadInstalled();
     loadCatalog();
 });
 
 api.onDownloadError((data) => {
-    document.getElementById('download-progress').style.display = 'none';
-    alert(`Download failed: ${data.error}`);
+    const modelId = data?.model_id;
+    if (modelId) activeDownloads.delete(modelId);
+    loadCatalog();
 });
 
-// Utility functions
+// Native confirm/alert is blocked in Tauri webview
+function showConfirm(message) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'confirm-overlay';
+        overlay.innerHTML = `
+            <div class="confirm-dialog">
+                <p>${message}</p>
+                <div class="confirm-actions">
+                    <button class="btn-confirm-cancel">Cancel</button>
+                    <button class="btn-confirm-delete">Delete</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        overlay.querySelector('.btn-confirm-cancel').addEventListener('click', () => {
+            overlay.remove();
+            resolve(false);
+        });
+        overlay.querySelector('.btn-confirm-delete').addEventListener('click', () => {
+            overlay.remove();
+            resolve(true);
+        });
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                overlay.remove();
+                resolve(false);
+            }
+        });
+    });
+}
+
 function formatSize(bytes) {
     if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
     if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;
@@ -226,7 +328,6 @@ function formatTime(seconds) {
     return `${seconds}s`;
 }
 
-// App version
 async function loadVersion() {
     try {
         const version = await api.getAppVersion();
@@ -236,7 +337,6 @@ async function loadVersion() {
     }
 }
 
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
     checkAccessibility();

@@ -32,35 +32,29 @@ function showMode(mode) {
     }
 }
 
-// Listen for recording status changes
 api.onRecordingStatus((data) => {
     showMode(data.status);
 });
 
-// Listen for audio level (update visualizer bars)
 api.onAudioLevel((data) => {
     const level = data.level;
     bars.forEach((bar, i) => {
-        // Create a somewhat random-looking visualization based on the level
         const offset = Math.sin(Date.now() / 200 + i * 0.5) * 0.3;
         const height = Math.max(4, (level + offset) * 48);
         bar.style.height = `${height}px`;
     });
 });
 
-// Listen for overlay mode (STT vs TTS)
 api.onOverlayMode((data) => {
     if (data.mode === 'tts') {
         showMode('tts');
     }
 });
 
-// Listen for transcription complete — hide overlay
 api.onTranscriptionComplete(() => {
     setTimeout(() => showMode('idle'), 500);
 });
 
-// TTS playback progress
 api.onPlaybackProgress((data) => {
     const fill = document.getElementById('tts-progress');
     if (fill) fill.style.width = `${data.progress * 100}%`;

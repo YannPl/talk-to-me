@@ -126,6 +126,70 @@
       }
     },
     {
+      "id": "nvidia/parakeet-tdt-0.6b-v3-fp16",
+      "name": "Parakeet TDT 0.6B v3 (FP16)",
+      "description": "Multilingual (25 languages), half-precision — ~1.2 GB, great quality/size ratio.",
+      "capability": "speech_to_text",
+      "engine": "onnx",
+      "languages": ["multi"],
+      "files": [
+        {
+          "filename": "encoder-model.fp16.onnx",
+          "hf_repo": "grikdotnet/parakeet-tdt-0.6b-fp16",
+          "local_filename": "encoder-model.onnx",
+          "size_bytes": 1238960452
+        },
+        {
+          "filename": "decoder_joint-model.fp16.onnx",
+          "hf_repo": "grikdotnet/parakeet-tdt-0.6b-fp16",
+          "local_filename": "decoder_joint-model.onnx",
+          "size_bytes": 36266140
+        },
+        {
+          "filename": "vocab.txt",
+          "hf_repo": "grikdotnet/parakeet-tdt-0.6b-fp16",
+          "size_bytes": 93939
+        }
+      ],
+      "preprocessing": {
+        "sample_rate": 16000,
+        "feature_type": "mel_spectrogram",
+        "n_mels": 128
+      }
+    },
+    {
+      "id": "nvidia/parakeet-tdt-0.6b-v3-int8",
+      "name": "Parakeet TDT 0.6B v3 (INT8)",
+      "description": "Multilingual (25 languages), quantized — ~670 MB, ideal for 8 GB RAM machines.",
+      "capability": "speech_to_text",
+      "engine": "onnx",
+      "languages": ["multi"],
+      "files": [
+        {
+          "filename": "encoder-model.int8.onnx",
+          "hf_repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+          "local_filename": "encoder-model.onnx",
+          "size_bytes": 652183999
+        },
+        {
+          "filename": "decoder_joint-model.int8.onnx",
+          "hf_repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+          "local_filename": "decoder_joint-model.onnx",
+          "size_bytes": 18202004
+        },
+        {
+          "filename": "vocab.txt",
+          "hf_repo": "istupakov/parakeet-tdt-0.6b-v3-onnx",
+          "size_bytes": 93939
+        }
+      ],
+      "preprocessing": {
+        "sample_rate": 16000,
+        "feature_type": "mel_spectrogram",
+        "n_mels": 128
+      }
+    },
+    {
       "id": "rhasspy/piper-voices",
       "name": "Piper FR Medium",
       "description": "Natural French voice, very lightweight.",

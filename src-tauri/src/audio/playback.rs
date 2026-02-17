@@ -1,7 +1,6 @@
 use anyhow::Result;
 use crate::engine::AudioBuffer;
 
-/// Audio playback for TTS output (Phase 6)
 pub struct AudioPlayback;
 
 impl AudioPlayback {

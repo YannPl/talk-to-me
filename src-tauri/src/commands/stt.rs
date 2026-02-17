@@ -5,19 +5,16 @@ use crate::state::{AppState, AppStatus};
 use crate::audio::AudioCapture;
 use crate::platform;
 
-/// Tauri command: start recording
 #[tauri::command]
 pub fn start_recording(app_handle: AppHandle) -> Result<(), String> {
     do_start_recording(&app_handle).map_err(|e| e.to_string())
 }
 
-/// Tauri command: stop recording and transcribe
 #[tauri::command]
 pub async fn stop_recording(app_handle: AppHandle) -> Result<String, String> {
     do_stop_recording(&app_handle).await.map_err(|e| e.to_string())
 }
 
-/// Tauri command: get current app status
 #[tauri::command]
 pub fn get_status(app_handle: AppHandle) -> Result<String, String> {
     let state = app_handle.state::<AppState>();
@@ -25,7 +22,6 @@ pub fn get_status(app_handle: AppHandle) -> Result<String, String> {
     serde_json::to_string(&status).map_err(|e| e.to_string())
 }
 
-/// Internal: start recording
 pub fn do_start_recording(app_handle: &AppHandle) -> Result<()> {
     let state = app_handle.state::<AppState>();
 
@@ -47,11 +43,9 @@ pub fn do_start_recording(app_handle: &AppHandle) -> Result<()> {
     Ok(())
 }
 
-/// Internal: stop recording and transcribe
 pub async fn do_stop_recording(app_handle: &AppHandle) -> Result<String> {
     let state = app_handle.state::<AppState>();
 
-    // Stop capture
     let audio_buffer = {
         let mut capture_guard = state.audio_capture.lock().unwrap();
         let capture = capture_guard.as_mut()
@@ -61,14 +55,12 @@ pub async fn do_stop_recording(app_handle: &AppHandle) -> Result<String> {
         buffer
     };
 
-    // Update status to transcribing
     {
         let mut status = state.status.lock().unwrap();
         *status = AppStatus::Transcribing;
     }
     let _ = app_handle.emit("recording-status", serde_json::json!({"status": "transcribing"}));
 
-    // Transcribe
     let result = {
         let engine_guard = state.active_stt_engine.lock().unwrap();
         let engine = engine_guard.as_ref()
@@ -78,7 +70,6 @@ pub async fn do_stop_recording(app_handle: &AppHandle) -> Result<String> {
 
     tracing::info!("Transcription complete: '{}' ({}ms)", result.text, result.duration_ms);
 
-    // Inject text
     let injector = platform::get_text_injector();
     let injection_mode = {
         state.settings.lock().unwrap().stt.injection_mode.clone()
@@ -97,7 +88,6 @@ pub async fn do_stop_recording(app_handle: &AppHandle) -> Result<String> {
         }
     }
 
-    // Reset status
     {
         let mut status = state.status.lock().unwrap();
         *status = AppStatus::Idle;

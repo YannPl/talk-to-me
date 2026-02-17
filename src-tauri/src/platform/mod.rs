@@ -3,11 +3,8 @@ mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::*;
 
-// Future: windows.rs, linux.rs
-
 use anyhow::Result;
 
-/// Inject text into the active application (STT -> app)
 pub trait TextInjector: Send + Sync {
     fn inject_text(&self, text: &str) -> Result<()>;
     fn inject_via_clipboard(&self, text: &str) -> Result<()>;
@@ -15,13 +12,11 @@ pub trait TextInjector: Send + Sync {
     fn request_accessibility(&self) -> Result<()>;
 }
 
-/// Read selected text from the active application (future TTS)
 pub trait TextSelector: Send + Sync {
     fn get_selected_text(&self) -> Result<Option<String>>;
     fn is_supported(&self) -> bool;
 }
 
-/// Get the platform text injector
 pub fn get_text_injector() -> Box<dyn TextInjector> {
     #[cfg(target_os = "macos")]
     {

@@ -3,8 +3,6 @@ use anyhow::Result;
 
 use super::{Engine, TtsEngine, ModelCapability, ModelInfo, AudioBuffer, TtsOptions};
 
-/// ONNX Runtime TTS engine (Piper, Bark, Coqui XTTS)
-/// Full implementation in Phase 6
 pub struct OnnxTtsEngine {
     loaded: bool,
 }

@@ -29,6 +29,17 @@
             </div>
 
             <div class="setting-group">
+                <h3>Recording Mode</h3>
+                <div class="setting-row">
+                    <label>Shortcut behavior</label>
+                    <select id="recording-mode">
+                        <option value="toggle">Toggle (press to start/stop)</option>
+                        <option value="push_to_talk">Push to talk (hold to record)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-group">
                 <h3>Transcription Language</h3>
                 <div class="setting-row">
                     <label>Language</label>
@@ -108,17 +119,6 @@
                 </div>
             </div>
 
-            <!-- Download progress (hidden by default) -->
-            <div id="download-progress" class="download-bar" style="display:none;">
-                <div class="download-info">
-                    <span id="download-model-name">Downloading...</span>
-                    <span id="download-stats"></span>
-                </div>
-                <div class="progress-bar">
-                    <div id="progress-fill" class="progress-fill"></div>
-                </div>
-                <button id="cancel-download" class="btn-icon" title="Cancel">&#x2715;</button>
-            </div>
         </section>
     </div>
 

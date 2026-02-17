@@ -12,7 +12,23 @@ pub fn get_settings(app_handle: AppHandle) -> Result<Settings, String> {
 pub fn update_settings(app_handle: AppHandle, settings: Settings) -> Result<(), String> {
     let state = app_handle.state::<AppState>();
     let mut current = state.settings.lock().unwrap();
+
+    // Preserve active_model_id fields — these are managed by set_active_model/delete_model,
+    // not by the frontend settings form (which sends null)
+    let stt_active = current.stt.active_model_id.clone();
+    let tts_active = current.tts.active_model_id.clone();
+
     *current = settings;
+
+    if current.stt.active_model_id.is_none() {
+        current.stt.active_model_id = stt_active;
+    }
+    if current.tts.active_model_id.is_none() {
+        current.tts.active_model_id = tts_active;
+    }
+
+    drop(current); // release lock before save_settings re-acquires it
+    crate::persistence::save_settings(&app_handle);
     Ok(())
 }
 

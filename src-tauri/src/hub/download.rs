@@ -1,8 +1,11 @@
 use std::path::Path;
+use std::sync::atomic::Ordering;
 use anyhow::{Result, Context};
 use futures_util::StreamExt;
 use tauri::{AppHandle, Emitter};
 use serde::Serialize;
+
+use crate::state::CancelFlag;
 
 #[derive(Clone, Serialize)]
 pub struct DownloadProgress {
@@ -12,15 +15,14 @@ pub struct DownloadProgress {
     pub eta_seconds: u64,
 }
 
-/// Download a file from URL to destination with progress events
 pub async fn download_file(
     app_handle: &AppHandle,
     model_id: &str,
     url: &str,
     dest: &Path,
     expected_size: u64,
+    cancel_flag: &CancelFlag,
 ) -> Result<()> {
-    // Create parent directories
     if let Some(parent) = dest.parent() {
         std::fs::create_dir_all(parent)
             .context("Failed to create model directory")?;
@@ -28,7 +30,6 @@ pub async fn download_file(
 
     let client = reqwest::Client::new();
 
-    // First, do a HEAD request to get the real file size
     let head_resp = client.head(url)
         .header("User-Agent", "TalkToMe/0.1")
         .send().await?
@@ -41,7 +42,6 @@ pub async fn download_file(
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(expected_size);
 
-    // Check for existing partial download (resume support)
     let mut downloaded: u64 = 0;
     let mut request = client.get(url)
         .header("User-Agent", "TalkToMe/0.1");
@@ -70,6 +70,11 @@ pub async fn download_file(
     let start_time = std::time::Instant::now();
 
     while let Some(chunk) = stream.next().await {
+        if cancel_flag.load(Ordering::Relaxed) {
+            tracing::info!("Download cancelled: {}", model_id);
+            anyhow::bail!("cancelled");
+        }
+
         let chunk = chunk.context("Error reading download stream")?;
         std::io::Write::write_all(&mut file, &chunk)?;
         downloaded += chunk.len() as u64;

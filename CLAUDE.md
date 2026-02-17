@@ -123,6 +123,7 @@ Alt+Space again → stop_recording
 - **State**: All shared state goes through `AppState` with `Mutex` wrappers. One STT engine + one TTS engine active at a time.
 - **Frontend**: No framework. Vanilla JS with `window.__TAURI__.core.invoke()` for IPC. Dark macOS-native theme.
 - **Naming**: Rust modules use snake_case. Model IDs follow HuggingFace format (`org/model-name`). Model directories on disk use `--` as separator (`org--model-name`).
+- **Comments**: No unnecessary comments. Only add comments when explaining non-obvious logic, tricky edge cases, or compiler-required annotations (e.g., `#[allow(...)]`). The code should be self-documenting. Never add comments that just restate what the code does.
 
 ## Build notes
 

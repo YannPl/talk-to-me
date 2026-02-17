@@ -623,59 +623,72 @@ select option {
     background: rgba(255, 59, 48, 0.25);
 }
 
-/* --- Download Progress Bar --- */
-.download-bar {
+/* --- Model Action (download button / inline progress) --- */
+.model-action {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    margin-top: 12px;
-    border: 1px solid var(--border-color);
-    position: sticky;
-    bottom: 0;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
-.download-info {
-    flex: 1;
-    min-width: 0;
+/* --- Inline Progress (inside catalog card) --- */
+.inline-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100px;
 }
 
-.download-info span {
-    display: block;
-}
-
-#download-model-name {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-#download-stats {
-    font-size: 11px;
-    color: var(--text-secondary);
-    margin-top: 2px;
-}
-
-.progress-bar {
-    flex: 1;
+.inline-progress-bar {
     height: 6px;
     background: var(--bg-active);
     border-radius: 3px;
     overflow: hidden;
-    min-width: 80px;
 }
 
-.progress-fill {
+.inline-progress-fill {
     height: 100%;
     background: var(--accent-blue);
     border-radius: 3px;
     width: 0%;
     transition: width 300ms ease-out;
+}
+
+.inline-progress-text {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* --- Cancel Button --- */
+.btn-cancel {
+    font-family: var(--font-stack);
+    font-size: 12px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 59, 48, 0.15);
+    color: var(--accent-red);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    outline: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    line-height: 1;
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 59, 48, 0.3);
+}
+
+.btn-cancel:active {
+    background: var(--accent-red);
+    color: #FFFFFF;
 }
 
 .btn-icon {
@@ -718,6 +731,72 @@ select option {
     font-size: 11px;
     color: var(--text-tertiary);
     letter-spacing: 0.02em;
+}
+
+/* --- Confirm Dialog --- */
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 100ms ease-out;
+}
+
+.confirm-dialog {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    max-width: 300px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.confirm-dialog p {
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    line-height: 1.5;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.confirm-actions button {
+    font-family: var(--font-stack);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 16px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    outline: none;
+    transition: all var(--transition-fast);
+}
+
+.btn-confirm-cancel {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.btn-confirm-cancel:hover {
+    background: var(--bg-active);
+}
+
+.btn-confirm-delete {
+    background: var(--accent-red);
+    border-color: var(--accent-red);
+    color: #FFFFFF;
+}
+
+.btn-confirm-delete:hover {
+    background: #FF453A;
 }
 
 /* --- Animations --- */

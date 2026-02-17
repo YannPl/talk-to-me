@@ -1,9 +1,13 @@
+use std::collections::HashMap;
 use std::sync::Mutex;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use serde::{Serialize, Deserialize};
 
 use crate::engine::{SttEngine, TtsEngine};
 
-/// Application status
+pub type CancelFlag = Arc<AtomicBool>;
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AppStatus {
@@ -20,13 +24,13 @@ impl Default for AppStatus {
     }
 }
 
-/// Global application state shared across Tauri commands
 pub struct AppState {
     pub active_stt_engine: Mutex<Option<Box<dyn SttEngine>>>,
     pub active_tts_engine: Mutex<Option<Box<dyn TtsEngine>>>,
     pub status: Mutex<AppStatus>,
     pub settings: Mutex<Settings>,
     pub audio_capture: Mutex<Option<crate::audio::AudioCapture>>,
+    pub download_cancels: Mutex<HashMap<String, CancelFlag>>,
 }
 
 impl AppState {
@@ -37,11 +41,11 @@ impl AppState {
             status: Mutex::new(AppStatus::default()),
             settings: Mutex::new(Settings::default()),
             audio_capture: Mutex::new(None),
+            download_cancels: Mutex::new(HashMap::new()),
         }
     }
 }
 
-/// User preferences
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub shortcuts: ShortcutSettings,
@@ -80,6 +84,8 @@ impl Default for ShortcutSettings {
 pub struct SttSettings {
     pub language: String,
     pub injection_mode: InjectionMode,
+    #[serde(default)]
+    pub recording_mode: RecordingMode,
     pub active_model_id: Option<String>,
 }
 
@@ -88,6 +94,7 @@ impl Default for SttSettings {
         Self {
             language: "auto".to_string(),
             injection_mode: InjectionMode::Clipboard,
+            recording_mode: RecordingMode::default(),
             active_model_id: None,
         }
     }
@@ -98,6 +105,19 @@ impl Default for SttSettings {
 pub enum InjectionMode {
     Keystroke,
     Clipboard,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RecordingMode {
+    Toggle,
+    PushToTalk,
+}
+
+impl Default for RecordingMode {
+    fn default() -> Self {
+        Self::Toggle
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

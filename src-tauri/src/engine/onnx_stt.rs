@@ -7,34 +7,20 @@ use ort::value::Tensor;
 use super::{Engine, SttEngine, ModelCapability, ModelInfo, AudioBuffer, TranscriptionResult};
 use crate::audio::processing::{MelConfig, mel_spectrogram, mel_num_frames};
 
-/// Token vocabulary loaded from vocab.txt or tokenizer.json
 struct Vocabulary {
-    /// Token ID → string mapping
     tokens: Vec<String>,
-    /// Blank token ID (for CTC / TDT decoding)
     blank_id: usize,
-    /// Total vocab size (without blank for TDT, or full for CTC)
     vocab_size: usize,
 }
 
-/// Parakeet model variant
 #[derive(Debug, Clone, PartialEq)]
 enum ParakeetVariant {
-    /// CTC — single model, greedy argmax decoding
     Ctc,
-    /// TDT — encoder + decoder_joint, autoregressive transducer decoding
     Tdt,
 }
 
-/// ONNX Runtime STT engine for Parakeet (NeMo) models
-///
-/// Supports two architectures:
-/// - CTC: single model.onnx with greedy argmax decoding
-/// - TDT: encoder-model.onnx + decoder_joint-model.onnx with autoregressive decoding
 pub struct OnnxSttEngine {
-    /// For CTC: the single model session. For TDT: the encoder session.
     encoder_session: Mutex<Option<Session>>,
-    /// For TDT only: the decoder_joint session (None for CTC)
     decoder_session: Mutex<Option<Session>>,
     vocabulary: Mutex<Option<Vocabulary>>,
     variant: Mutex<ParakeetVariant>,
@@ -52,7 +38,6 @@ impl OnnxSttEngine {
         }
     }
 
-    /// Load vocabulary from model directory, trying vocab.txt first, then tokenizer.json
     fn load_vocabulary_from_dir(model_dir: &Path) -> Result<Vocabulary> {
         let vocab_txt = model_dir.join("vocab.txt");
         let tokenizer_json = model_dir.join("tokenizer.json");
@@ -66,7 +51,6 @@ impl OnnxSttEngine {
         }
     }
 
-    /// Load vocabulary from vocab.txt (NeMo format: "token id" per line)
     fn load_vocab_txt(path: &Path) -> Result<Vocabulary> {
         let data = std::fs::read_to_string(path)
             .context("Failed to read vocab.txt")?;
@@ -78,7 +62,6 @@ impl OnnxSttEngine {
             if line.is_empty() {
                 continue;
             }
-            // Format: "token id" (space-separated, last token is the id)
             if let Some(last_space) = line.rfind(' ') {
                 let token = &line[..last_space];
                 if let Ok(id) = line[last_space + 1..].parse::<usize>() {
@@ -113,7 +96,6 @@ impl OnnxSttEngine {
         Ok(Vocabulary { tokens, blank_id, vocab_size })
     }
 
-    /// Load tokenizer vocabulary from tokenizer.json (HuggingFace/NeMo format)
     fn load_tokenizer_json(tokenizer_path: &Path) -> Result<Vocabulary> {
         let data = std::fs::read_to_string(tokenizer_path)
             .context("Failed to read tokenizer.json")?;
@@ -122,7 +104,6 @@ impl OnnxSttEngine {
 
         let mut tokens: Vec<String> = Vec::new();
 
-        // Try NeMo format: "model" -> "vocab"
         if let Some(model) = json.get("model") {
             if let Some(vocab) = model.get("vocab") {
                 if let Some(vocab_arr) = vocab.as_array() {
@@ -145,7 +126,6 @@ impl OnnxSttEngine {
             }
         }
 
-        // Fallback: try top-level "vocab" key
         if tokens.is_empty() {
             if let Some(vocab) = json.get("vocab") {
                 if let Some(vocab_map) = vocab.as_object() {
@@ -169,7 +149,6 @@ impl OnnxSttEngine {
         Ok(Vocabulary { tokens, blank_id, vocab_size })
     }
 
-    /// Detect model variant from the model ID
     fn detect_variant(model_id: &str) -> ParakeetVariant {
         if model_id.contains("tdt") {
             ParakeetVariant::Tdt
@@ -178,7 +157,6 @@ impl OnnxSttEngine {
         }
     }
 
-    /// CTC greedy decoding: argmax per frame, collapse repeated tokens, remove blanks
     fn ctc_decode(logits: &[f32], time_steps: usize, vocab_size: usize, vocab: &Vocabulary) -> String {
         let mut prev_token: Option<usize> = None;
         let mut result_tokens: Vec<&str> = Vec::new();
@@ -215,15 +193,9 @@ impl OnnxSttEngine {
         raw.replace('\u{2581}', " ").trim().to_string()
     }
 
-    // ─── TDT autoregressive decoding ───
-
-    /// Run TDT transducer greedy decoding over encoder outputs.
-    ///
-    /// This follows the NeMo TDT decoding algorithm:
-    /// 1. Encoder produces encoded features [1, D, T'] from mel spectrogram
-    /// 2. For each time step, decoder_joint predicts token + duration
-    /// 3. Duration determines how many encoder frames to skip (0-4)
-    /// 4. Blank tokens don't emit text, non-blank tokens are accumulated
+    /// NeMo TDT transducer decoding: for each encoder time step, the decoder_joint
+    /// predicts a token + duration (0-4 frames to skip). Non-blank tokens are emitted,
+    /// LSTM state is only updated on non-blank emissions.
     fn tdt_decode(
         decoder_session: &mut Session,
         encoder_out: &[f32],      // flat [T', D] row-major (after transpose)
@@ -232,11 +204,10 @@ impl OnnxSttEngine {
         vocab: &Vocabulary,
     ) -> Result<String> {
         let max_tokens_per_step = 10;
-        let num_tdt_durations = 5; // durations [0, 1, 2, 3, 4]
+        let num_tdt_durations = 5;
 
-        // State dimensions for the decoder LSTM.
-        // We'll detect actual dimensions from the first decoder run's output shapes.
-        // Initial guess based on Parakeet TDT 0.6B v3: [2, 1, 640]
+        // LSTM state dimensions — initial guess [2, 1, 640] based on Parakeet TDT 0.6B v3,
+        // auto-detected from first decoder output
         let mut s1_dim0: usize = 2;
         let mut s1_dim2: usize = 640;
         let mut s2_dim0: usize = 2;
@@ -253,13 +224,11 @@ impl OnnxSttEngine {
         let mut emitted_this_step: usize = 0;
 
         while t < encoded_length {
-            // Extract encoder output for current frame: [1, D, 1]
             let frame_start = t * encoder_dim;
             let frame_end = frame_start + encoder_dim;
             if frame_end > encoder_out.len() { break; }
             let encoder_frame: Vec<f32> = encoder_out[frame_start..frame_end].to_vec();
 
-            // Create input tensors
             let enc_tensor = Tensor::from_array((
                 vec![1i64, encoder_dim as i64, 1i64],
                 encoder_frame,
@@ -286,12 +255,10 @@ impl OnnxSttEngine {
                 state2.clone(),
             )).context("Failed to create state2 tensor")?;
 
-            // Log shapes on first iteration for debugging
             if t == 0 {
                 tracing::info!("TDT decoder first call: encoder_frame=[1, {}, 1], targets=[[{}]], state1=[{}, 1, {}], state2=[{}, 1, {}]",
                     encoder_dim, prev_token_id, s1_dim0, s1_dim2, s2_dim0, s2_dim2);
 
-                // Log expected input names from session
                 let dec_input_names: Vec<String> = decoder_session.inputs().iter()
                     .map(|i| i.name().to_string()).collect();
                 let dec_output_names: Vec<String> = decoder_session.outputs().iter()
@@ -300,7 +267,6 @@ impl OnnxSttEngine {
                 tracing::info!("TDT decoder outputs: {:?}", dec_output_names);
             }
 
-            // Run decoder_joint
             let outputs = match decoder_session.run(ort::inputs![
                 "encoder_outputs" => enc_tensor,
                 "targets" => targets_tensor,
@@ -315,7 +281,6 @@ impl OnnxSttEngine {
                 }
             };
 
-            // Extract outputs
             let logits_value = outputs.get("outputs")
                 .context("No 'outputs' tensor from decoder_joint")?;
             let new_state1_value = outputs.get("output_states_1")
@@ -330,7 +295,6 @@ impl OnnxSttEngine {
             let (s2_shape, s2_data) = new_state2_value.try_extract_tensor::<f32>()
                 .context("Failed to extract state2")?;
 
-            // On first iteration, detect actual state dimensions from output
             if !state_dims_detected {
                 let s1_dims: Vec<usize> = s1_shape.iter().map(|&d| d as usize).collect();
                 let s2_dims: Vec<usize> = s2_shape.iter().map(|&d| d as usize).collect();
@@ -348,8 +312,7 @@ impl OnnxSttEngine {
                 state_dims_detected = true;
             }
 
-            // Split output into token logits and duration logits
-            // Output shape: [vocab_size + num_tdt_durations]
+            // Output: [vocab_size + num_tdt_durations] logits
             let token_logits = if logits_data.len() >= vocab.vocab_size {
                 &logits_data[..vocab.vocab_size]
             } else {
@@ -360,18 +323,15 @@ impl OnnxSttEngine {
             let duration_logits = if logits_data.len() >= vocab.vocab_size + num_tdt_durations {
                 &logits_data[vocab.vocab_size..vocab.vocab_size + num_tdt_durations]
             } else {
-                // No duration info available, will default step to 0
                 &logits_data[0..0]
             };
 
-            // Argmax for token
             let token_id = token_logits.iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i)
                 .unwrap_or(vocab.blank_id);
 
-            // Argmax for duration step
             let step: usize = if !duration_logits.is_empty() {
                 duration_logits.iter()
                     .enumerate()
@@ -379,12 +339,10 @@ impl OnnxSttEngine {
                     .map(|(i, _)| i)
                     .unwrap_or(0)
             } else {
-                0 // Will be handled below
+                0
             };
 
-            // Emit token if not blank
             if token_id != vocab.blank_id && token_id < vocab.tokens.len() {
-                // Update state only on non-blank emissions
                 state1 = s1_data.to_vec();
                 state2 = s2_data.to_vec();
                 prev_token_id = token_id as i32;
@@ -392,7 +350,6 @@ impl OnnxSttEngine {
                 emitted_this_step += 1;
             }
 
-            // Advance time based on step/blank/max_tokens
             if step > 0 {
                 t += step;
                 emitted_this_step = 0;
@@ -423,7 +380,6 @@ impl Engine for OnnxSttEngine {
 
         match variant {
             ParakeetVariant::Ctc => {
-                // CTC: single model.onnx
                 let onnx_path = model_dir.join("model.onnx");
                 if !onnx_path.exists() {
                     anyhow::bail!("model.onnx not found in {}", model_dir.display());
@@ -446,7 +402,6 @@ impl Engine for OnnxSttEngine {
                 *self.decoder_session.lock().unwrap() = None;
             }
             ParakeetVariant::Tdt => {
-                // TDT: encoder-model.onnx + decoder_joint-model.onnx
                 let encoder_path = model_dir.join("encoder-model.onnx");
                 let decoder_path = model_dir.join("decoder_joint-model.onnx");
 
@@ -493,7 +448,6 @@ impl Engine for OnnxSttEngine {
         *self.vocabulary.lock().unwrap() = Some(vocabulary);
         *self.variant.lock().unwrap() = variant.clone();
 
-        // Configure mel spectrogram based on variant
         let mut mel_cfg = self.mel_config.lock().unwrap();
         mel_cfg.sample_rate = 16000;
         mel_cfg.n_fft = 512;
@@ -544,7 +498,6 @@ impl SttEngine for OnnxSttEngine {
 
         let start = std::time::Instant::now();
 
-        // Step 1: Compute mel spectrogram → flat vec [n_mels * n_frames] row-major
         let n_frames = mel_num_frames(audio.samples.len(), &mel_cfg);
         let mel_flat = mel_spectrogram(&audio.samples, &mel_cfg);
 
@@ -555,7 +508,6 @@ impl SttEngine for OnnxSttEngine {
                 let mut session_guard = self.encoder_session.lock().unwrap();
                 let session = session_guard.as_mut().context("CTC model not loaded")?;
 
-                // Create ONNX tensors
                 let mel_tensor = Tensor::from_array((
                     vec![1i64, mel_cfg.n_mels as i64, n_frames as i64],
                     mel_flat,
@@ -566,7 +518,6 @@ impl SttEngine for OnnxSttEngine {
                     vec![n_frames as i64],
                 )).context("Failed to create length tensor")?;
 
-                // Capture names before run()
                 let input_names: Vec<String> = session.inputs().iter().map(|i| i.name().to_string()).collect();
                 let output_names: Vec<String> = session.outputs().iter().map(|o| o.name().to_string()).collect();
 
@@ -603,7 +554,6 @@ impl SttEngine for OnnxSttEngine {
             }
 
             ParakeetVariant::Tdt => {
-                // TDT: run encoder, then autoregressive decoder
                 let encoder_out;
                 let encoded_length: usize;
                 let encoder_dim: usize;
@@ -635,7 +585,6 @@ impl SttEngine for OnnxSttEngine {
                         ]).context("TDT encoder inference failed (single input)")?
                     };
 
-                    // Extract encoder outputs
                     let enc_value = enc_outputs.get("outputs")
                         .context("No 'outputs' tensor from encoder")?;
                     let enc_len_value = enc_outputs.get("encoded_lengths")
@@ -649,14 +598,12 @@ impl SttEngine for OnnxSttEngine {
                     let enc_dims: Vec<usize> = enc_shape.iter().map(|&d| d as usize).collect();
                     tracing::info!("TDT encoder output shape: {:?}", enc_dims);
 
-                    // Encoder outputs: [batch=1, D, T'] — need to transpose to [T', D]
-                    // for frame-by-frame decoder access
+                    // Transpose [1, D, T'] → [T', D] for frame-by-frame decoder access
                     if enc_dims.len() == 3 {
                         let _batch = enc_dims[0];
                         let d = enc_dims[1];
                         let t_enc = enc_dims[2];
 
-                        // Transpose [1, D, T'] → [T', D] (row-major)
                         let mut transposed = vec![0.0f32; t_enc * d];
                         for i in 0..d {
                             for j in 0..t_enc {
@@ -672,9 +619,8 @@ impl SttEngine for OnnxSttEngine {
                     }
 
                     tracing::info!("Encoder: {} frames x {} dim, encoded_length={}", encoder_out.len() / encoder_dim, encoder_dim, encoded_length);
-                } // encoder session lock released here
+                }
 
-                // Now run decoder_joint autoregressively
                 let mut dec_guard = self.decoder_session.lock().unwrap();
                 let decoder = dec_guard.as_mut().context("TDT decoder_joint not loaded")?;
 
