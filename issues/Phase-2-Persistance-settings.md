@@ -1,1 +1,0 @@
-Implémenter la persistance des paramètres utilisateur en utilisant tauri-plugin-store pour la sauvegarde et le chargement des configurations.
