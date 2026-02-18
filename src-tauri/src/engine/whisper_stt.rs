@@ -1,18 +1,20 @@
 use std::path::Path;
 use std::sync::Mutex;
 use anyhow::{Result, Context};
-use whisper_rs::{WhisperContext, WhisperContextParameters, FullParams, SamplingStrategy};
+use whisper_rs::{WhisperContext, WhisperContextParameters, WhisperState, FullParams, SamplingStrategy};
 
 use super::{Engine, SttEngine, ModelCapability, ModelInfo, AudioBuffer, TranscriptionResult, Segment};
 
 pub struct WhisperSttEngine {
     context: Mutex<Option<WhisperContext>>,
+    cached_state: Mutex<Option<WhisperState>>,
 }
 
 impl WhisperSttEngine {
     pub fn new() -> Self {
         Self {
             context: Mutex::new(None),
+            cached_state: Mutex::new(None),
         }
     }
 }
@@ -30,6 +32,7 @@ impl Engine for WhisperSttEngine {
     }
 
     fn unload_model(&mut self) -> Result<()> {
+        *self.cached_state.lock().unwrap() = None;
         *self.context.lock().unwrap() = None;
         Ok(())
     }
@@ -44,18 +47,23 @@ impl Engine for WhisperSttEngine {
 }
 
 impl SttEngine for WhisperSttEngine {
-    fn transcribe(&self, audio: &AudioBuffer) -> Result<TranscriptionResult> {
+    fn transcribe(&self, audio: &AudioBuffer, language: Option<&str>) -> Result<TranscriptionResult> {
         let ctx_guard = self.context.lock().unwrap();
         let ctx = ctx_guard.as_ref().context("Model not loaded")?;
 
-        let mut state = ctx.create_state().map_err(|e| anyhow::anyhow!("Failed to create state: {}", e))?;
+        let cached = self.cached_state.lock().unwrap().take();
+        let mut state = match cached {
+            Some(s) => s,
+            None => ctx.create_state()
+                .map_err(|e| anyhow::anyhow!("Failed to create state: {}", e))?,
+        };
 
         let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
         params.set_print_special(false);
         params.set_print_progress(false);
         params.set_print_realtime(false);
         params.set_print_timestamps(false);
-        params.set_language(Some("auto"));
+        params.set_language(language.or(Some("auto")));
 
         let start = std::time::Instant::now();
 
@@ -92,11 +100,29 @@ impl SttEngine for WhisperSttEngine {
                 whisper_rs::get_lang_str(id).map(|s| s.to_string())
             });
 
+        *self.cached_state.lock().unwrap() = Some(state);
+
         Ok(TranscriptionResult {
             text: text.trim().to_string(),
             language,
             duration_ms,
             segments: Some(segments),
         })
+    }
+
+    fn warm_up(&self) -> Result<()> {
+        let ctx_guard = self.context.lock().unwrap();
+        let ctx = ctx_guard.as_ref().context("Model not loaded")?;
+        let state = ctx.create_state()
+            .map_err(|e| anyhow::anyhow!("Failed to create state: {}", e))?;
+        *self.cached_state.lock().unwrap() = Some(state);
+        tracing::info!("Whisper state warmed up");
+        Ok(())
+    }
+
+    fn cool_down(&self) -> Result<()> {
+        *self.cached_state.lock().unwrap() = None;
+        tracing::info!("Whisper state cooled down");
+        Ok(())
     }
 }

@@ -16,6 +16,19 @@
         "height": 450,
         "resizable": true,
         "visible": false
+      },
+      {
+        "label": "overlay",
+        "url": "overlay.html",
+        "title": "",
+        "width": 360,
+        "height": 92,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "visible": false,
+        "resizable": false,
+        "shadow": false
       }
     ],
     "security": {

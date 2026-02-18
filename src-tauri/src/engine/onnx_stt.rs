@@ -489,7 +489,7 @@ impl Engine for OnnxSttEngine {
 }
 
 impl SttEngine for OnnxSttEngine {
-    fn transcribe(&self, audio: &AudioBuffer) -> Result<TranscriptionResult> {
+    fn transcribe(&self, audio: &AudioBuffer, language: Option<&str>) -> Result<TranscriptionResult> {
         let variant = self.variant.lock().unwrap().clone();
         let mel_cfg = self.mel_config.lock().unwrap().clone();
 
@@ -633,7 +633,7 @@ impl SttEngine for OnnxSttEngine {
 
         Ok(TranscriptionResult {
             text,
-            language: Some("en".to_string()),
+            language: language.map(|l| l.to_string()),
             duration_ms,
             segments: None,
         })

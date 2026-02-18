@@ -53,8 +53,9 @@ models/
 # =========================
 .claude/settings.local.json
 .claude/todos.json
-.claude/plans
-.claude/worktrees
+.claude/plans/
+.claude/worktrees/
+.claude/skills/
 
 # =========================
 # Environment / Secrets

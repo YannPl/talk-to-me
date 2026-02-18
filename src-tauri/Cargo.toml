@@ -28,7 +28,7 @@ rubato = "0.14"
 hound = "3.5"
 
 # ML Inference
-whisper-rs = "0.12"
+whisper-rs = { version = "0.12", features = ["metal"] }
 ort = { version = "2.0.0-rc.11" }
 
 # HuggingFace

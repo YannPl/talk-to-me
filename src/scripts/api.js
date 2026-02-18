@@ -42,6 +42,8 @@ export const onDownloadError = (callback) => listen('download-error', (e) => cal
 export const onRecordingStatus = (callback) => listen('recording-status', (e) => callback(e.payload));
 export const onAudioLevel = (callback) => listen('audio-level', (e) => callback(e.payload));
 export const onTranscriptionComplete = (callback) => listen('transcription-complete', (e) => callback(e.payload));
+export const onTranscriptionProgress = (callback) => listen('transcription-progress', (e) => callback(e.payload));
+export const onStreamingTranscription = (callback) => listen('streaming-transcription', (e) => callback(e.payload));
 export const onOverlayMode = (callback) => listen('overlay-mode', (e) => callback(e.payload));
 export const onPlaybackStatus = (callback) => listen('playback-status', (e) => callback(e.payload));
 export const onPlaybackProgress = (callback) => listen('playback-progress', (e) => callback(e.payload));

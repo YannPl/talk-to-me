@@ -5,9 +5,29 @@ const modeStt = document.getElementById('mode-stt');
 const modeTranscribing = document.getElementById('mode-transcribing');
 const modeTts = document.getElementById('mode-tts');
 const sttStatus = document.getElementById('stt-status');
-const bars = document.querySelectorAll('.visualizer .bar');
+
+const BAR_COUNT = 48;
+const visualizer = document.getElementById('audio-visualizer');
+for (let i = 0; i < BAR_COUNT; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    const t = i / (BAR_COUNT - 1);
+    bar.style.animationDelay = `${(0.5 - Math.abs(t - 0.5)) * 1.2}s`;
+    visualizer.appendChild(bar);
+}
+const bars = visualizer.querySelectorAll('.bar');
+
+let smoothLevel = 0;
+let previousMode = 'idle';
+
+function resetBars() {
+    smoothLevel = 0;
+    bars.forEach(bar => bar.style.removeProperty('height'));
+}
 
 function showMode(mode) {
+    previousMode = mode;
+
     modeStt.classList.add('hidden');
     modeTranscribing.classList.add('hidden');
     modeTts.classList.add('hidden');
@@ -19,6 +39,8 @@ function showMode(mode) {
             overlay.classList.add('visible');
             break;
         case 'transcribing':
+            resetBars();
+            document.getElementById('transcription-progress').style.removeProperty('width');
             modeTranscribing.classList.remove('hidden');
             overlay.classList.add('visible');
             break;
@@ -27,6 +49,7 @@ function showMode(mode) {
             overlay.classList.add('visible');
             break;
         case 'idle':
+            resetBars();
             overlay.classList.remove('visible');
             break;
     }
@@ -36,18 +59,35 @@ api.onRecordingStatus((data) => {
     showMode(data.status);
 });
 
+
 api.onAudioLevel((data) => {
-    const level = data.level;
+    const alpha = data.level > smoothLevel ? 0.5 : 0.15;
+    smoothLevel += (data.level - smoothLevel) * alpha;
+    const now = Date.now();
     bars.forEach((bar, i) => {
-        const offset = Math.sin(Date.now() / 200 + i * 0.5) * 0.3;
-        const height = Math.max(4, (level + offset) * 48);
-        bar.style.height = `${height}px`;
+        const w1 = Math.sin(now / 150 + i * 0.7) * 0.25;
+        const w2 = Math.sin(now / 300 + i * 1.3) * 0.15;
+        const h = Math.max(4, (smoothLevel + (w1 + w2) * smoothLevel) * 48);
+        bar.style.height = `${h}px`;
     });
 });
 
 api.onOverlayMode((data) => {
     if (data.mode === 'tts') {
         showMode('tts');
+    }
+});
+
+api.onStreamingTranscription((data) => {
+    if (previousMode === 'recording' && data.chunks_completed > 0) {
+        sttStatus.textContent = `Listening... (${data.chunks_completed} chunk${data.chunks_completed > 1 ? 's' : ''} ready)`;
+    }
+});
+
+api.onTranscriptionProgress((data) => {
+    const fill = document.getElementById('transcription-progress');
+    if (fill && data.total > 1) {
+        fill.style.width = `${(data.chunk / data.total) * 100}%`;
     }
 });
 

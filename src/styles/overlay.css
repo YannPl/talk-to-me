@@ -131,41 +131,27 @@ body {
 .visualizer {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 3px;
+    justify-content: space-between;
     height: 24px;
+    width: 100%;
 }
 
 .visualizer .bar {
-    width: 3px;
+    width: 2px;
     height: 4px;
     min-height: 4px;
-    background: var(--accent-red);
-    border-radius: 1.5px;
-    transition: height 80ms ease-out;
+    background: rgba(255, 255, 255, 0.85);
+    border-radius: 1px;
+    transition: height 60ms ease-out;
     animation: bar-idle 1.2s ease-in-out infinite;
 }
-
-/* Stagger the idle animation for each bar */
-.visualizer .bar:nth-child(1)  { animation-delay: 0.00s; }
-.visualizer .bar:nth-child(2)  { animation-delay: 0.10s; }
-.visualizer .bar:nth-child(3)  { animation-delay: 0.20s; }
-.visualizer .bar:nth-child(4)  { animation-delay: 0.30s; }
-.visualizer .bar:nth-child(5)  { animation-delay: 0.40s; }
-.visualizer .bar:nth-child(6)  { animation-delay: 0.50s; }
-.visualizer .bar:nth-child(7)  { animation-delay: 0.60s; }
-.visualizer .bar:nth-child(8)  { animation-delay: 0.50s; }
-.visualizer .bar:nth-child(9)  { animation-delay: 0.40s; }
-.visualizer .bar:nth-child(10) { animation-delay: 0.30s; }
-.visualizer .bar:nth-child(11) { animation-delay: 0.20s; }
-.visualizer .bar:nth-child(12) { animation-delay: 0.10s; }
 
 @keyframes bar-idle {
     0%, 100% {
         height: 4px;
     }
     50% {
-        height: 16px;
+        height: 14px;
     }
 }
 

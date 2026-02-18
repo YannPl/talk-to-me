@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use serde::{Serialize, Deserialize};
 
-use crate::engine::{SttEngine, TtsEngine};
+use crate::engine::{SttEngine, TtsEngine, Segment};
 
 pub type CancelFlag = Arc<AtomicBool>;
 
@@ -24,6 +24,15 @@ impl Default for AppStatus {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct StreamingState {
+    pub completed_text: String,
+    pub chunks_completed: usize,
+    pub locked_language: Option<String>,
+    pub total_duration_ms: u64,
+    pub segments: Vec<Segment>,
+}
+
 pub struct AppState {
     pub active_stt_engine: Mutex<Option<Box<dyn SttEngine>>>,
     pub active_tts_engine: Mutex<Option<Box<dyn TtsEngine>>>,
@@ -31,6 +40,8 @@ pub struct AppState {
     pub settings: Mutex<Settings>,
     pub audio_capture: Mutex<Option<crate::audio::AudioCapture>>,
     pub download_cancels: Mutex<HashMap<String, CancelFlag>>,
+    pub streaming_state: Mutex<Option<StreamingState>>,
+    pub streaming_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
 }
 
 impl AppState {
@@ -42,6 +53,8 @@ impl AppState {
             settings: Mutex::new(Settings::default()),
             audio_capture: Mutex::new(None),
             download_cancels: Mutex::new(HashMap::new()),
+            streaming_state: Mutex::new(None),
+            streaming_thread: Mutex::new(None),
         }
     }
 }

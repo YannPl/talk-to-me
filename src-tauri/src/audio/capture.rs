@@ -114,4 +114,66 @@ impl AudioCapture {
     pub fn is_recording(&self) -> bool {
         self.is_recording.load(Ordering::SeqCst)
     }
+
+    pub fn level_monitor(&self) -> LevelMonitor {
+        LevelMonitor {
+            samples: Arc::clone(&self.samples),
+            is_recording: Arc::clone(&self.is_recording),
+        }
+    }
+
+    pub fn streaming_drain(&self) -> StreamingDrain {
+        StreamingDrain {
+            samples: Arc::clone(&self.samples),
+            is_recording: Arc::clone(&self.is_recording),
+            device_sample_rate: self.device_sample_rate,
+        }
+    }
+}
+
+pub struct LevelMonitor {
+    samples: Arc<Mutex<Vec<f32>>>,
+    is_recording: Arc<AtomicBool>,
+}
+
+impl LevelMonitor {
+    pub fn is_active(&self) -> bool {
+        self.is_recording.load(Ordering::SeqCst)
+    }
+
+    pub fn current_level(&self) -> f32 {
+        let guard = self.samples.lock().unwrap();
+        if guard.is_empty() {
+            return 0.0;
+        }
+        let window_size = 1600.min(guard.len());
+        let start = guard.len() - window_size;
+        let rms: f32 = guard[start..].iter().map(|s| s * s).sum::<f32>() / window_size as f32;
+        rms.sqrt().min(1.0)
+    }
+}
+
+pub struct StreamingDrain {
+    samples: Arc<Mutex<Vec<f32>>>,
+    is_recording: Arc<AtomicBool>,
+    device_sample_rate: u32,
+}
+
+impl StreamingDrain {
+    pub fn drain(&self) -> Vec<f32> {
+        let mut guard = self.samples.lock().unwrap();
+        std::mem::take(&mut *guard)
+    }
+
+    pub fn available_samples(&self) -> usize {
+        self.samples.lock().unwrap().len()
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.is_recording.load(Ordering::SeqCst)
+    }
+
+    pub fn device_sample_rate(&self) -> u32 {
+        self.device_sample_rate
+    }
 }

@@ -67,7 +67,9 @@ pub trait Engine: Send + Sync {
 }
 
 pub trait SttEngine: Engine {
-    fn transcribe(&self, audio: &AudioBuffer) -> Result<TranscriptionResult>;
+    fn transcribe(&self, audio: &AudioBuffer, language: Option<&str>) -> Result<TranscriptionResult>;
+    fn warm_up(&self) -> Result<()> { Ok(()) }
+    fn cool_down(&self) -> Result<()> { Ok(()) }
 }
 
 pub trait TtsEngine: Engine {

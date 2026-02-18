@@ -162,6 +162,18 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // Position the overlay window (defined in tauri.conf.json, starts hidden)
+            if let Some(overlay) = app.get_webview_window("overlay") {
+                if let Ok(Some(monitor)) = overlay.current_monitor() {
+                    let scale: f64 = monitor.scale_factor();
+                    let screen_width = monitor.size().width as f64 / scale;
+                    let x = (screen_width - 360.0) / 2.0;
+                    let _ = overlay.set_position(tauri::Position::Logical(
+                        tauri::LogicalPosition::new(x, 80.0),
+                    ));
+                }
+            }
+
             {
                 let loaded = persistence::load_settings(app.handle());
                 let state = app.state::<AppState>();

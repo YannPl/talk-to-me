@@ -1,6 +1,85 @@
 use anyhow::Result;
 use rubato::{SincFixedIn, SincInterpolationType, SincInterpolationParameters, WindowFunction, Resampler};
 
+#[derive(Debug, Clone)]
+pub struct ChunkBoundary {
+    pub start_sample: usize,
+    pub end_sample: usize,
+}
+
+/// Splits audio into chunks at silence points for chunked transcription.
+///
+/// - `target_duration_s`: ideal chunk length (e.g. 28s)
+/// - `search_window_s`: how far around each target cut to search for silence (e.g. 3s)
+/// - `rms_window_ms`: RMS analysis window size in milliseconds (e.g. 100)
+pub fn split_at_silence(
+    samples: &[f32],
+    sample_rate: u32,
+    target_duration_s: f32,
+    search_window_s: f32,
+    rms_window_ms: f32,
+) -> Vec<ChunkBoundary> {
+    let total_samples = samples.len();
+    let max_chunk_samples = ((target_duration_s + search_window_s) * sample_rate as f32) as usize;
+
+    // If audio fits in a single chunk (with margin), return it whole
+    if total_samples <= max_chunk_samples {
+        return vec![ChunkBoundary { start_sample: 0, end_sample: total_samples }];
+    }
+
+    // Compute RMS per window across entire audio
+    let rms_win_samples = ((rms_window_ms / 1000.0) * sample_rate as f32) as usize;
+    let rms_win_samples = rms_win_samples.max(1);
+    let num_windows = total_samples / rms_win_samples;
+    let rms_values: Vec<f32> = (0..num_windows)
+        .map(|i| {
+            let start = i * rms_win_samples;
+            let end = (start + rms_win_samples).min(total_samples);
+            let sum_sq: f32 = samples[start..end].iter().map(|s| s * s).sum();
+            (sum_sq / (end - start) as f32).sqrt()
+        })
+        .collect();
+
+    let target_samples = (target_duration_s * sample_rate as f32) as usize;
+    let search_samples = (search_window_s * sample_rate as f32) as usize;
+
+    let mut chunks = Vec::new();
+    let mut chunk_start: usize = 0;
+
+    while chunk_start < total_samples {
+        let remaining = total_samples - chunk_start;
+        if remaining <= max_chunk_samples {
+            chunks.push(ChunkBoundary { start_sample: chunk_start, end_sample: total_samples });
+            break;
+        }
+
+        let ideal_cut = chunk_start + target_samples;
+        let search_lo = ideal_cut.saturating_sub(search_samples);
+        let search_hi = (ideal_cut + search_samples).min(total_samples);
+
+        // Find the RMS window index range for our search region
+        let win_lo = search_lo / rms_win_samples;
+        let win_hi = (search_hi / rms_win_samples).min(num_windows);
+
+        let mut best_win = win_lo;
+        let mut best_rms = f32::MAX;
+        for w in win_lo..win_hi {
+            if rms_values[w] < best_rms {
+                best_rms = rms_values[w];
+                best_win = w;
+            }
+        }
+
+        // Cut at center of the quietest window
+        let cut_sample = (best_win * rms_win_samples + rms_win_samples / 2).min(total_samples);
+
+        chunks.push(ChunkBoundary { start_sample: chunk_start, end_sample: cut_sample });
+        chunk_start = cut_sample;
+    }
+
+    chunks
+}
+
 pub fn resample(samples: &[f32], from_rate: u32, to_rate: u32) -> Result<Vec<f32>> {
     if from_rate == to_rate {
         return Ok(samples.to_vec());
