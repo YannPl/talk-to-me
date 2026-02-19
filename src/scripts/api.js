@@ -35,6 +35,7 @@ export const updateSettings = (settings) => invoke('update_settings', { settings
 export const updateSttShortcut = (shortcut) => invoke('update_stt_shortcut', { shortcut });
 export const checkAccessibilityPermission = () => invoke('check_accessibility_permission');
 export const requestAccessibilityPermission = () => invoke('request_accessibility_permission');
+export const getSttShortcutLabel = () => invoke('get_stt_shortcut_label');
 export const getAppVersion = () => invoke('get_app_version');
 
 export const onDownloadProgress = (callback) => listen('download-progress', (e) => callback(e.payload));
@@ -48,4 +49,5 @@ export const onStreamingTranscription = (callback) => listen('streaming-transcri
 export const onOverlayMode = (callback) => listen('overlay-mode', (e) => callback(e.payload));
 export const onPlaybackStatus = (callback) => listen('playback-status', (e) => callback(e.payload));
 export const onPlaybackProgress = (callback) => listen('playback-progress', (e) => callback(e.payload));
+export const onSttShortcutChanged = (callback) => listen('stt-shortcut-changed', (e) => callback(e.payload));
 export const onNavigateTab = (callback) => listen('navigate-tab', (e) => callback(e.payload));

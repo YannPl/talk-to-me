@@ -43,6 +43,7 @@ pub fn run() {
             commands::settings::get_settings,
             commands::settings::update_settings,
             commands::settings::update_stt_shortcut,
+            commands::settings::get_stt_shortcut_label,
             commands::settings::check_accessibility_permission,
             commands::settings::request_accessibility_permission,
             commands::settings::get_app_version,

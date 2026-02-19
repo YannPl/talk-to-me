@@ -74,6 +74,13 @@ pub fn request_accessibility_permission() -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn get_stt_shortcut_label(app_handle: AppHandle) -> String {
+    let state = app_handle.state::<AppState>();
+    let shortcut = state.settings.lock().unwrap().shortcuts.stt.clone();
+    crate::hotkey::shortcut_display_label(&shortcut).to_string()
+}
+
+#[tauri::command]
 pub fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }

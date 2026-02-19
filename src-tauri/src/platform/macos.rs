@@ -1,6 +1,60 @@
 use anyhow::Result;
 use super::{TextInjector, TextSelector};
 
+type CGEventRef = *mut std::ffi::c_void;
+
+extern "C" {
+    fn AXIsProcessTrusted() -> bool;
+    fn CGEventCreateKeyboardEvent(
+        source: *const std::ffi::c_void,
+        virtual_key: u16,
+        key_down: bool,
+    ) -> CGEventRef;
+    fn CGEventSetFlags(event: CGEventRef, flags: u64);
+    fn CGEventPost(tap: u32, event: CGEventRef);
+    fn CFRelease(cf: *const std::ffi::c_void);
+}
+
+const K_VK_V: u16 = 9;
+const K_CG_EVENT_FLAG_MASK_COMMAND: u64 = 1 << 20;
+const K_CG_HID_EVENT_TAP: u32 = 0;
+
+fn simulate_cmd_v() -> Result<()> {
+    unsafe {
+        let key_down = CGEventCreateKeyboardEvent(std::ptr::null(), K_VK_V, true);
+        if key_down.is_null() {
+            anyhow::bail!("Failed to create CGEvent for Cmd+V — grant Accessibility permission");
+        }
+        CGEventSetFlags(key_down, K_CG_EVENT_FLAG_MASK_COMMAND);
+        CGEventPost(K_CG_HID_EVENT_TAP, key_down);
+
+        let key_up = CGEventCreateKeyboardEvent(std::ptr::null(), K_VK_V, false);
+        if !key_up.is_null() {
+            CGEventSetFlags(key_up, K_CG_EVENT_FLAG_MASK_COMMAND);
+            CGEventPost(K_CG_HID_EVENT_TAP, key_up);
+            CFRelease(key_up as *const _);
+        }
+
+        CFRelease(key_down as *const _);
+    }
+    Ok(())
+}
+
+fn copy_to_clipboard(text: &str) -> Result<()> {
+    use std::process::Command;
+    use std::io::Write;
+
+    let mut child = Command::new("pbcopy")
+        .env("LANG", "en_US.UTF-8")
+        .stdin(std::process::Stdio::piped())
+        .spawn()?;
+    if let Some(ref mut stdin) = child.stdin {
+        stdin.write_all(text.as_bytes())?;
+    }
+    child.wait()?;
+    Ok(())
+}
+
 pub struct MacOsTextInjector;
 
 impl MacOsTextInjector {
@@ -15,28 +69,20 @@ impl TextInjector for MacOsTextInjector {
     }
 
     fn inject_via_clipboard(&self, text: &str) -> Result<()> {
-        use std::process::Command;
-
-        let mut child = Command::new("pbcopy")
-            .stdin(std::process::Stdio::piped())
-            .spawn()?;
-
-        if let Some(ref mut stdin) = child.stdin {
-            use std::io::Write;
-            stdin.write_all(text.as_bytes())?;
+        copy_to_clipboard(text)?;
+        if self.is_accessibility_granted() {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            if let Err(e) = simulate_cmd_v() {
+                tracing::warn!("CGEvent Cmd+V failed: {}. Text is in clipboard.", e);
+            }
+        } else {
+            tracing::info!("Accessibility not granted — text copied to clipboard, paste manually with Cmd+V");
         }
-        child.wait()?;
-
-        Command::new("osascript")
-            .arg("-e")
-            .arg("tell application \"System Events\" to keystroke \"v\" using command down")
-            .output()?;
-
         Ok(())
     }
 
     fn is_accessibility_granted(&self) -> bool {
-        true
+        unsafe { AXIsProcessTrusted() }
     }
 
     fn request_accessibility(&self) -> Result<()> {

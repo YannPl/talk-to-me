@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::ShortcutState;
 use anyhow::Result;
 use crate::state::RecordingMode;
@@ -117,6 +117,9 @@ pub fn update_stt_shortcut(app_handle: &AppHandle, new_shortcut: &str) -> Result
     state.settings.lock().unwrap().shortcuts.stt = new_shortcut.to_string();
     crate::persistence::save_settings(app_handle);
     update_tray_shortcut_label(app_handle, new_shortcut);
+
+    let label = shortcut_display_label(new_shortcut);
+    let _ = app_handle.emit("stt-shortcut-changed", serde_json::json!({ "label": label }));
 
     Ok(())
 }

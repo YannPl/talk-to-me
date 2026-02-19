@@ -7,6 +7,10 @@ const modeTts = document.getElementById('mode-tts');
 const modeLoading = document.getElementById('mode-loading');
 const sttStatus = document.getElementById('stt-status');
 
+const shortcutHint = document.getElementById('shortcut-hint');
+api.getSttShortcutLabel().then(label => { shortcutHint.textContent = label; });
+api.onSttShortcutChanged((data) => { shortcutHint.textContent = data.label; });
+
 const BAR_COUNT = 48;
 const visualizer = document.getElementById('audio-visualizer');
 for (let i = 0; i < BAR_COUNT; i++) {
