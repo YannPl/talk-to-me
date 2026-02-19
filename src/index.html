@@ -20,7 +20,12 @@
                 <h3>Keyboard Shortcuts</h3>
                 <div class="setting-row">
                     <label>Dictation (STT)</label>
-                    <div class="shortcut-capture" id="stt-shortcut" tabindex="0">&#x2325;Space</div>
+                    <select id="stt-shortcut">
+                        <option value="Alt+Space">&#x2325; Space</option>
+                        <option value="Ctrl+Space">&#x2303; Space</option>
+                        <option value="Super+Shift+Space">&#x2318;&#x21E7; Space</option>
+                        <option value="RightCommand">Right &#x2318;</option>
+                    </select>
                 </div>
                 <div class="setting-row disabled">
                     <label>Read aloud (TTS) <span class="badge-future">Coming soon</span></label>
@@ -35,6 +40,23 @@
                     <select id="recording-mode">
                         <option value="toggle">Toggle (press to start/stop)</option>
                         <option value="push_to_talk">Push to talk (hold to record)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <h3>Model Active Duration</h3>
+                <div class="setting-row">
+                    <label>Unload model after</label>
+                    <select id="idle-timeout">
+                        <option value="10">10 seconds</option>
+                        <option value="30">30 seconds</option>
+                        <option value="60">1 minute</option>
+                        <option value="300">5 minutes</option>
+                        <option value="900">15 minutes</option>
+                        <option value="1800">30 minutes</option>
+                        <option value="3600">1 hour</option>
+                        <option value="never">Never (always loaded)</option>
                     </select>
                 </div>
             </div>

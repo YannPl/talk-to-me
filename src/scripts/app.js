@@ -18,9 +18,14 @@ api.onNavigateTab((tabName) => switchTab(tabName));
 async function loadSettings() {
     try {
         const settings = await api.getSettings();
+        const sttShortcutEl = document.getElementById('stt-shortcut');
+        sttShortcutEl.value = settings.shortcuts.stt || 'Alt+Space';
+        sttShortcutEl.dataset.previousValue = sttShortcutEl.value;
         document.getElementById('language-select').value = settings.stt.language;
         document.getElementById('injection-mode').value = settings.stt.injection_mode;
         document.getElementById('recording-mode').value = settings.stt.recording_mode || 'toggle';
+        const timeoutVal = settings.stt.model_idle_timeout_s;
+        document.getElementById('idle-timeout').value = timeoutVal === null ? 'never' : String(timeoutVal);
         document.getElementById('launch-at-login').checked = settings.general.launch_at_login;
         document.getElementById('sound-feedback').checked = settings.general.sound_feedback;
     } catch (e) {
@@ -32,14 +37,18 @@ async function saveSettings() {
     try {
         const settings = {
             shortcuts: {
-                stt: document.getElementById('stt-shortcut').textContent.trim(),
-                tts: 'Option+Shift+Space',
+                stt: document.getElementById('stt-shortcut').value,
+                tts: 'Alt+Shift+Space',
             },
             stt: {
                 language: document.getElementById('language-select').value,
                 injection_mode: document.getElementById('injection-mode').value,
                 recording_mode: document.getElementById('recording-mode').value,
-                active_model_id: null, // managed separately
+                active_model_id: null,
+                model_idle_timeout_s: (() => {
+                    const v = document.getElementById('idle-timeout').value;
+                    return v === 'never' ? null : parseInt(v, 10);
+                })(),
             },
             tts: {
                 active_model_id: null,
@@ -57,11 +66,24 @@ async function saveSettings() {
     }
 }
 
-['language-select', 'injection-mode', 'recording-mode'].forEach(id => {
+['language-select', 'injection-mode', 'recording-mode', 'idle-timeout'].forEach(id => {
     document.getElementById(id).addEventListener('change', saveSettings);
 });
 ['launch-at-login', 'sound-feedback'].forEach(id => {
     document.getElementById(id).addEventListener('change', saveSettings);
+});
+
+document.getElementById('stt-shortcut').addEventListener('change', async (e) => {
+    const select = e.target;
+    const newShortcut = select.value;
+    const previousValue = select.dataset.previousValue || 'Alt+Space';
+    try {
+        await api.updateSttShortcut(newShortcut);
+        select.dataset.previousValue = newShortcut;
+    } catch (err) {
+        console.error('Failed to update shortcut:', err);
+        select.value = previousValue;
+    }
 });
 
 async function checkAccessibility() {
