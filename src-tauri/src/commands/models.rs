@@ -167,7 +167,10 @@ pub fn delete_model(app_handle: AppHandle, model_id: String) -> Result<(), Strin
 #[tauri::command]
 pub fn set_active_model(app_handle: AppHandle, model_id: String, capability: String) -> Result<(), String> {
     match capability.as_str() {
-        "stt" => load_stt_engine(&app_handle, &model_id).map_err(|e| e.to_string())?,
+        "stt" => {
+            load_stt_engine(&app_handle, &model_id).map_err(|e| e.to_string())?;
+            crate::commands::stt::reset_idle_timer(&app_handle);
+        }
         "tts" => {
             let state = app_handle.state::<crate::state::AppState>();
             state.settings.lock().unwrap().tts.active_model_id = Some(model_id);

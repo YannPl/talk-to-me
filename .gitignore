@@ -56,6 +56,7 @@ models/
 .claude/plans/
 .claude/worktrees/
 .claude/skills/
+docs/plans/
 
 # =========================
 # Environment / Secrets

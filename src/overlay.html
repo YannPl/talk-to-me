@@ -18,6 +18,17 @@
             <div class="visualizer" id="audio-visualizer"></div>
         </div>
 
+        <!-- Loading model (cold start) -->
+        <div class="overlay-content hidden" id="mode-loading">
+            <div class="status-row">
+                <span class="spinner"></span>
+                <span class="status-text">Loading model...</span>
+            </div>
+            <div class="progress-bar-mini">
+                <div class="progress-fill-mini loading"></div>
+            </div>
+        </div>
+
         <!-- Transcription in progress -->
         <div class="overlay-content hidden" id="mode-transcribing">
             <div class="status-row">

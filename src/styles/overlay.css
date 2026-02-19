@@ -220,6 +220,10 @@ body {
     background: var(--accent-blue);
 }
 
+.progress-fill-mini.loading {
+    background: #FF9F0A;
+}
+
 /* --- Playback Icon (TTS mode) --- */
 .playback-icon {
     font-size: 16px;

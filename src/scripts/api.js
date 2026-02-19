@@ -32,6 +32,7 @@ export const stopSpeaking = () => invoke('stop_speaking');
 
 export const getSettings = () => invoke('get_settings');
 export const updateSettings = (settings) => invoke('update_settings', { settings });
+export const updateSttShortcut = (shortcut) => invoke('update_stt_shortcut', { shortcut });
 export const checkAccessibilityPermission = () => invoke('check_accessibility_permission');
 export const requestAccessibilityPermission = () => invoke('request_accessibility_permission');
 export const getAppVersion = () => invoke('get_app_version');
