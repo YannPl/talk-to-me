@@ -526,7 +526,7 @@ pub(crate) fn reset_idle_timer(app_handle: &AppHandle) {
 
     if let Some(seconds) = timeout_s {
         let handle = app_handle.clone();
-        let task = tokio::spawn(async move {
+        let task = tauri::async_runtime::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_secs(seconds)).await;
             let state = handle.state::<AppState>();
             let mut engine_guard = state.active_stt_engine.lock().unwrap();
@@ -535,7 +535,7 @@ pub(crate) fn reset_idle_timer(app_handle: &AppHandle) {
                 tracing::info!("STT engine unloaded after {}s idle timeout", seconds);
             }
         });
-        *state.idle_timer_abort.lock().unwrap() = Some(task.abort_handle());
+        *state.idle_timer_abort.lock().unwrap() = Some(task);
     }
 }
 

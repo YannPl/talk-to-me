@@ -44,7 +44,7 @@ pub struct AppState {
     pub streaming_state: Mutex<Option<StreamingState>>,
     pub streaming_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
     pub tray_stt_shortcut_item: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,
-    pub idle_timer_abort: Mutex<Option<tokio::task::AbortHandle>>,
+    pub idle_timer_abort: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
 }
 
 impl AppState {
