@@ -11,7 +11,6 @@ type CFStringRef = *const std::ffi::c_void;
 
 type CGEventType = u32;
 type CGEventMask = u64;
-type CGEventField = u32;
 type CGEventTapLocation = u32;
 type CGEventTapPlacement = u32;
 type CGEventTapOptions = u32;
@@ -20,9 +19,13 @@ const K_CG_SESSION_EVENT_TAP: CGEventTapLocation = 1;
 const K_CG_HEAD_INSERT_EVENT_TAP: CGEventTapPlacement = 0;
 const K_CG_EVENT_TAP_OPTION_LISTEN_ONLY: CGEventTapOptions = 1;
 const K_CG_EVENT_FLAGS_CHANGED: CGEventType = 12;
-const K_CG_KEYBOARD_EVENT_KEYCODE: CGEventField = 6;
-const K_CG_EVENT_FLAG_MASK_COMMAND: u64 = 1 << 20;
-const RIGHT_COMMAND_KEYCODE: i64 = 54;
+const K_CG_EVENT_TAP_DISABLED_BY_TIMEOUT: CGEventType = 0xFFFFFFFE;
+const K_CG_EVENT_TAP_DISABLED_BY_USER_INPUT: CGEventType = 0xFFFFFFFF;
+
+// Device-level flag that identifies the Right Command key specifically.
+// kCGKeyboardEventKeycode is unreliable for kCGEventFlagsChanged on modern
+// macOS (always returns 0), so we detect Right Cmd via this NX device mask.
+const NX_DEVICERCMDKEYMASK: u64 = 0x10;
 
 type CGEventTapCallBack = unsafe extern "C" fn(
     CGEventTapProxy,
@@ -40,7 +43,7 @@ extern "C" {
         callback: CGEventTapCallBack,
         user_info: *mut std::ffi::c_void,
     ) -> CFMachPortRef;
-    fn CGEventGetIntegerValueField(event: CGEventRef, field: CGEventField) -> i64;
+    fn CGEventTapEnable(tap: CFMachPortRef, enable: bool);
     fn CGEventGetFlags(event: CGEventRef) -> u64;
     fn CFMachPortCreateRunLoopSource(
         allocator: *const std::ffi::c_void,
@@ -59,6 +62,7 @@ extern "C" {
 
 static RUNNING: AtomicBool = AtomicBool::new(false);
 static RUN_LOOP_REF: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
+static TAP_PORT: AtomicPtr<std::ffi::c_void> = AtomicPtr::new(std::ptr::null_mut());
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static CMD_DOWN: AtomicBool = AtomicBool::new(false);
 
@@ -68,25 +72,28 @@ unsafe extern "C" fn tap_callback(
     event: CGEventRef,
     _user_info: *mut std::ffi::c_void,
 ) -> CGEventRef {
-    if event_type != K_CG_EVENT_FLAGS_CHANGED {
-        return event;
-    }
-
-    let keycode = unsafe { CGEventGetIntegerValueField(event, K_CG_KEYBOARD_EVENT_KEYCODE) };
-    if keycode != RIGHT_COMMAND_KEYCODE {
-        // Not the right command key — reset our tracking
-        if CMD_DOWN.load(Ordering::SeqCst) {
-            CMD_DOWN.store(false, Ordering::SeqCst);
+    if event_type == K_CG_EVENT_TAP_DISABLED_BY_TIMEOUT
+        || event_type == K_CG_EVENT_TAP_DISABLED_BY_USER_INPUT
+    {
+        tracing::warn!("Right Command event tap was disabled by macOS, re-enabling");
+        let port = TAP_PORT.load(Ordering::SeqCst);
+        if !port.is_null() {
+            unsafe { CGEventTapEnable(port, true) };
         }
         return event;
     }
 
+    if event_type != K_CG_EVENT_FLAGS_CHANGED {
+        return event;
+    }
+
     let flags = unsafe { CGEventGetFlags(event) };
-    let cmd_pressed = (flags & K_CG_EVENT_FLAG_MASK_COMMAND) != 0;
+    let right_cmd_now = (flags & NX_DEVICERCMDKEYMASK) != 0;
     let was_down = CMD_DOWN.load(Ordering::SeqCst);
 
-    if cmd_pressed && !was_down {
+    if right_cmd_now && !was_down {
         CMD_DOWN.store(true, Ordering::SeqCst);
+        tracing::debug!("Right Command pressed (flags=0x{:X})", flags);
         if let Some(app) = APP_HANDLE.get() {
             let _ = super::handle_hotkey(
                 app,
@@ -94,8 +101,9 @@ unsafe extern "C" fn tap_callback(
                 tauri_plugin_global_shortcut::ShortcutState::Pressed,
             );
         }
-    } else if !cmd_pressed && was_down {
+    } else if !right_cmd_now && was_down {
         CMD_DOWN.store(false, Ordering::SeqCst);
+        tracing::debug!("Right Command released (flags=0x{:X})", flags);
         if let Some(app) = APP_HANDLE.get() {
             let _ = super::handle_hotkey(
                 app,
@@ -136,6 +144,8 @@ pub fn start_right_cmd_tap(app_handle: &AppHandle) -> anyhow::Result<()> {
                 return;
             }
 
+            TAP_PORT.store(tap, Ordering::SeqCst);
+
             let source =
                 CFMachPortCreateRunLoopSource(std::ptr::null(), tap, 0);
             let run_loop = CFRunLoopGetCurrent();
@@ -147,10 +157,10 @@ pub fn start_right_cmd_tap(app_handle: &AppHandle) -> anyhow::Result<()> {
             tracing::info!("Right Command event tap started");
             CFRunLoopRun();
 
-            // Cleanup after CFRunLoopStop
             CFMachPortInvalidate(tap);
             CFRelease(tap);
             CFRelease(source);
+            TAP_PORT.store(std::ptr::null_mut(), Ordering::SeqCst);
             RUNNING.store(false, Ordering::SeqCst);
             RUN_LOOP_REF.store(std::ptr::null_mut(), Ordering::SeqCst);
             tracing::info!("Right Command event tap stopped");
