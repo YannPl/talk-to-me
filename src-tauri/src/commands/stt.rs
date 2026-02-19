@@ -473,3 +473,32 @@ fn unregister_cancel_shortcut(app_handle: &AppHandle) {
     let escape: Shortcut = "Escape".parse().unwrap();
     let _ = app_handle.global_shortcut().unregister(escape);
 }
+
+pub(crate) fn reset_idle_timer(app_handle: &AppHandle) {
+    cancel_idle_timer(app_handle);
+
+    let state = app_handle.state::<AppState>();
+    let timeout_s = state.settings.lock().unwrap().stt.model_idle_timeout_s;
+
+    if let Some(seconds) = timeout_s {
+        let handle = app_handle.clone();
+        let task = tokio::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_secs(seconds)).await;
+            let state = handle.state::<AppState>();
+            let mut engine_guard = state.active_stt_engine.lock().unwrap();
+            if engine_guard.is_some() {
+                *engine_guard = None;
+                tracing::info!("STT engine unloaded after {}s idle timeout", seconds);
+            }
+        });
+        *state.idle_timer_abort.lock().unwrap() = Some(task.abort_handle());
+    }
+}
+
+pub(crate) fn cancel_idle_timer(app_handle: &AppHandle) {
+    let state = app_handle.state::<AppState>();
+    let abort_handle = state.idle_timer_abort.lock().unwrap().take();
+    if let Some(handle) = abort_handle {
+        handle.abort();
+    }
+}
