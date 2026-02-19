@@ -94,6 +94,46 @@ pub fn complete_onboarding(app_handle: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn finish_onboarding(app_handle: AppHandle) -> Result<(), String> {
+    let state = app_handle.state::<AppState>();
+    state.settings.lock().unwrap().general.onboarding_completed = true;
+    crate::persistence::save_settings(&app_handle);
+
+    let shortcut_label = crate::hotkey::shortcut_display_label(
+        &state.settings.lock().unwrap().shortcuts.stt,
+    );
+    let _ = tauri_plugin_notification::NotificationExt::notification(&app_handle)
+        .builder()
+        .title("Talk to Me is ready!")
+        .body(format!("Use {} to dictate.", shortcut_label))
+        .show();
+
+    if let Some(window) = app_handle.get_webview_window("onboarding") {
+        let _ = window.hide();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn rerun_onboarding(app_handle: AppHandle) -> Result<(), String> {
+    let state = app_handle.state::<AppState>();
+    state.settings.lock().unwrap().general.onboarding_completed = false;
+    crate::persistence::save_settings(&app_handle);
+    if let Some(window) = app_handle.get_webview_window("onboarding") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn retry_stt_shortcut(app_handle: AppHandle) -> Result<(), String> {
+    let state = app_handle.state::<AppState>();
+    let shortcut = state.settings.lock().unwrap().shortcuts.stt.clone();
+    crate::hotkey::register_stt_shortcut(&app_handle, &shortcut).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn check_microphone_permission() -> Result<bool, String> {
     use cpal::traits::{DeviceTrait, HostTrait};
     let host = cpal::default_host();

@@ -368,6 +368,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadVersion();
 });
 
+api.onSttShortcutChanged((data) => {
+    if (!data || !data.shortcut) return;
+    const el = document.getElementById('stt-shortcut');
+    if (el) {
+        el.value = data.shortcut;
+        el.dataset.previousValue = data.shortcut;
+    }
+});
+
 api.onPermissionMissing((data) => {
     const banner = document.getElementById('permission-banner');
     const text = document.getElementById('permission-banner-text');
@@ -383,4 +392,8 @@ api.onPermissionMissing((data) => {
 
 document.getElementById('permission-banner-dismiss')?.addEventListener('click', () => {
     document.getElementById('permission-banner').style.display = 'none';
+});
+
+document.getElementById('rerun-onboarding')?.addEventListener('click', async () => {
+    await api.rerunOnboarding();
 });

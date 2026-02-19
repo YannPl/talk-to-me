@@ -48,6 +48,9 @@ pub fn run() {
             commands::settings::request_accessibility_permission,
             commands::settings::get_app_version,
             commands::settings::complete_onboarding,
+            commands::settings::finish_onboarding,
+            commands::settings::rerun_onboarding,
+            commands::settings::retry_stt_shortcut,
             commands::settings::check_microphone_permission,
         ])
         .setup(|app| {

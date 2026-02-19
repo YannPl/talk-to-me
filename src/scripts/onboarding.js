@@ -3,6 +3,7 @@ import * as api from './api.js';
 const RECOMMENDED_MODEL = 'openai/whisper-large-v3-turbo';
 let currentStep = 1;
 let accessibilityPollingId = null;
+let accessibilityWasGranted = false;
 let installedModelId = null;
 const activeDownloads = new Set();
 
@@ -52,20 +53,8 @@ function goToStep(step) {
         loadCatalog();
     } else if (step === 3) {
         startAccessibilityPolling();
-        loadCurrentShortcut();
     } else if (step === 4) {
         enterTestStep();
-    }
-}
-
-async function loadCurrentShortcut() {
-    try {
-        const settings = await api.getSettings();
-        const shortcutEl = document.getElementById('onboarding-shortcut');
-        shortcutEl.value = settings.shortcuts.stt || 'Alt+Space';
-        shortcutEl.dataset.previousValue = shortcutEl.value;
-    } catch (e) {
-        console.error('Failed to load shortcut setting:', e);
     }
 }
 
@@ -98,7 +87,11 @@ async function loadCatalog() {
             nextBtn.disabled = true;
         }
 
-        for (const model of catalog) {
+        const sorted = [...catalog].sort((a, b) =>
+            (b.id === RECOMMENDED_MODEL) - (a.id === RECOMMENDED_MODEL)
+        );
+
+        for (const model of sorted) {
             if (installedIds.has(model.id)) continue;
 
             const totalSize = model.files.reduce((sum, f) => sum + f.size_bytes, 0);
@@ -255,6 +248,13 @@ async function checkAccessibilityNow() {
             skipHint.style.display = 'none';
             skipBtn.style.display = 'none';
             nextBtn.disabled = false;
+
+            if (!accessibilityWasGranted) {
+                accessibilityWasGranted = true;
+                api.retrySttShortcut().catch(e =>
+                    console.error('Failed to retry shortcut after accessibility granted:', e)
+                );
+            }
         } else {
             indicator.textContent = 'Permission required';
             indicator.className = 'permission-indicator denied';
@@ -270,10 +270,15 @@ async function checkAccessibilityNow() {
 
 async function enterTestStep() {
     try {
+        const settings = await api.getSettings();
+        const shortcutEl = document.getElementById('onboarding-shortcut');
+        shortcutEl.value = settings.shortcuts.stt || 'Alt+Space';
+        shortcutEl.dataset.previousValue = shortcutEl.value;
+
         const label = await api.getSttShortcutLabel();
         document.getElementById('test-shortcut-label').textContent = label;
     } catch (e) {
-        console.error('Failed to get shortcut label:', e);
+        console.error('Failed to load shortcut setting:', e);
     }
 
     const status = document.getElementById('test-status');
@@ -281,6 +286,7 @@ async function enterTestStep() {
     status.className = 'test-status';
     document.getElementById('test-result').textContent = '';
     document.getElementById('mic-error').style.display = 'none';
+    document.getElementById('shortcut-error').style.display = 'none';
 }
 
 api.onRecordingStatus((data) => {
@@ -331,22 +337,21 @@ api.onTranscriptionComplete((data) => {
 });
 
 api.onSttShortcutChanged((data) => {
+    if (!data) return;
     const label = document.getElementById('test-shortcut-label');
-    if (label && data && data.label) {
+    if (label && data.label) {
         label.textContent = data.label;
+    }
+    if (data.shortcut) {
+        const shortcutEl = document.getElementById('onboarding-shortcut');
+        if (shortcutEl) {
+            shortcutEl.value = data.shortcut;
+            shortcutEl.dataset.previousValue = data.shortcut;
+        }
     }
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        const settings = await api.getSettings();
-        const shortcutEl = document.getElementById('onboarding-shortcut');
-        shortcutEl.value = settings.shortcuts.stt || 'Alt+Space';
-        shortcutEl.dataset.previousValue = shortcutEl.value;
-    } catch (e) {
-        console.error('Failed to load settings:', e);
-    }
-
     document.getElementById('btn-start').addEventListener('click', () => goToStep(2));
 
     document.getElementById('btn-model-back').addEventListener('click', () => goToStep(1));
@@ -363,30 +368,27 @@ document.addEventListener('DOMContentLoaded', async () => {
         const select = e.target;
         const newShortcut = select.value;
         const previousValue = select.dataset.previousValue || 'Alt+Space';
+        const errorBanner = document.getElementById('shortcut-error');
+        const errorText = document.getElementById('shortcut-error-text');
         try {
             await api.updateSttShortcut(newShortcut);
             select.dataset.previousValue = newShortcut;
+            if (errorBanner) errorBanner.style.display = 'none';
         } catch (err) {
             console.error('Failed to update shortcut:', err);
             select.value = previousValue;
+            if (errorBanner && errorText) {
+                errorText.textContent = String(err).includes('Accessibility')
+                    ? 'Right \u2318 requires Accessibility permission. Please grant it in the previous step first.'
+                    : `Failed to set shortcut: ${err}`;
+                errorBanner.style.display = 'flex';
+            }
         }
     });
 
     document.getElementById('btn-test-back').addEventListener('click', () => goToStep(3));
     document.getElementById('btn-finish').addEventListener('click', async () => {
-        await api.completeOnboarding();
-        try {
-            const label = await api.getSttShortcutLabel();
-            const { sendNotification } = window.__TAURI__.notification;
-            sendNotification({
-                title: 'Talk to Me is ready!',
-                body: `Use ${label} to dictate.`,
-            });
-        } catch (e) {
-            console.error('Failed to send notification:', e);
-        }
-        const { getCurrentWindow } = window.__TAURI__.window;
-        await getCurrentWindow().close();
+        await api.finishOnboarding();
     });
 
     document.getElementById('btn-open-mic-prefs').addEventListener('click', () => {

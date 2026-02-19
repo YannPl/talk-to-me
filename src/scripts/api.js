@@ -39,6 +39,9 @@ export const getSttShortcutLabel = () => invoke('get_stt_shortcut_label');
 export const getAppVersion = () => invoke('get_app_version');
 
 export const completeOnboarding = () => invoke('complete_onboarding');
+export const finishOnboarding = () => invoke('finish_onboarding');
+export const rerunOnboarding = () => invoke('rerun_onboarding');
+export const retrySttShortcut = () => invoke('retry_stt_shortcut');
 export const checkMicrophonePermission = () => invoke('check_microphone_permission');
 
 export const onDownloadProgress = (callback) => listen('download-progress', (e) => callback(e.payload));

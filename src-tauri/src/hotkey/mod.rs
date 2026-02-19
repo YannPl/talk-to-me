@@ -1,14 +1,19 @@
+use crate::state::RecordingMode;
+use anyhow::Result;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::ShortcutState;
-use anyhow::Result;
-use crate::state::RecordingMode;
 
 #[cfg(target_os = "macos")]
 mod right_cmd;
 
-const VALID_SHORTCUTS: &[&str] = &["Alt+Space", "Ctrl+Space", "Super+Shift+Space", "RightCommand"];
+const VALID_SHORTCUTS: &[&str] = &[
+    "Alt+Space",
+    "Ctrl+Space",
+    "Super+Shift+Space",
+    "RightCommand",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HotkeyAction {
@@ -16,7 +21,11 @@ pub enum HotkeyAction {
     ToggleTts,
 }
 
-pub fn handle_hotkey(app_handle: &AppHandle, action: HotkeyAction, shortcut_state: ShortcutState) -> Result<()> {
+pub fn handle_hotkey(
+    app_handle: &AppHandle,
+    action: HotkeyAction,
+    shortcut_state: ShortcutState,
+) -> Result<()> {
     match action {
         HotkeyAction::ToggleStt => {
             handle_stt_shortcut(app_handle, shortcut_state)?;
@@ -50,14 +59,17 @@ pub fn register_stt_shortcut(app_handle: &AppHandle, shortcut: &str) -> Result<(
         }
     } else {
         use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-        let parsed: Shortcut = shortcut.parse()
+        let parsed: Shortcut = shortcut
+            .parse()
             .map_err(|e| anyhow::anyhow!("Invalid shortcut '{}': {}", shortcut, e))?;
         let app_clone = app_handle.clone();
-        app_handle.global_shortcut().on_shortcut(parsed, move |_app, _shortcut, event| {
-            if let Err(e) = handle_hotkey(&app_clone, HotkeyAction::ToggleStt, event.state) {
-                tracing::error!("Hotkey error: {}", e);
-            }
-        })?;
+        app_handle
+            .global_shortcut()
+            .on_shortcut(parsed, move |_app, _shortcut, event| {
+                if let Err(e) = handle_hotkey(&app_clone, HotkeyAction::ToggleStt, event.state) {
+                    tracing::error!("Hotkey error: {}", e);
+                }
+            })?;
     }
     tracing::info!("Registered STT shortcut: {}", shortcut);
     Ok(())
@@ -102,12 +114,20 @@ pub fn update_stt_shortcut(app_handle: &AppHandle, new_shortcut: &str) -> Result
 
     // Unregister the old shortcut
     if let Err(e) = unregister_stt_shortcut(app_handle, &old_shortcut) {
-        tracing::warn!("Failed to unregister old shortcut '{}': {}", old_shortcut, e);
+        tracing::warn!(
+            "Failed to unregister old shortcut '{}': {}",
+            old_shortcut,
+            e
+        );
     }
 
     // Register the new shortcut
     if let Err(e) = register_stt_shortcut(app_handle, new_shortcut) {
-        tracing::error!("Failed to register new shortcut '{}': {}. Rolling back.", new_shortcut, e);
+        tracing::error!(
+            "Failed to register new shortcut '{}': {}. Rolling back.",
+            new_shortcut,
+            e
+        );
         // Rollback: re-register old shortcut
         let _ = register_stt_shortcut(app_handle, &old_shortcut);
         anyhow::bail!("Failed to register shortcut '{}': {}", new_shortcut, e);
@@ -119,7 +139,10 @@ pub fn update_stt_shortcut(app_handle: &AppHandle, new_shortcut: &str) -> Result
     update_tray_shortcut_label(app_handle, new_shortcut);
 
     let label = shortcut_display_label(new_shortcut);
-    let _ = app_handle.emit("stt-shortcut-changed", serde_json::json!({ "label": label }));
+    let _ = app_handle.emit(
+        "stt-shortcut-changed",
+        serde_json::json!({ "label": label, "shortcut": new_shortcut }),
+    );
 
     Ok(())
 }
@@ -137,8 +160,20 @@ fn get_sound_paths() -> &'static SoundPaths {
         let _ = std::fs::create_dir_all(&dir);
         let start = dir.join("start.mp3");
         let stop = dir.join("stop.mp3");
-        let _ = std::fs::write(&start, include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/sounds/start.mp3")));
-        let _ = std::fs::write(&stop, include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../src/sounds/stop.mp3")));
+        let _ = std::fs::write(
+            &start,
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../src/sounds/start.mp3"
+            )),
+        );
+        let _ = std::fs::write(
+            &stop,
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../src/sounds/stop.mp3"
+            )),
+        );
         SoundPaths { start, stop }
     })
 }
@@ -155,9 +190,7 @@ fn play_feedback_sound(app_handle: &AppHandle, sound: &str) {
         _ => return,
     };
     std::thread::spawn(move || {
-        let _ = std::process::Command::new("afplay")
-            .arg(&path)
-            .output();
+        let _ = std::process::Command::new("afplay").arg(&path).output();
     });
 }
 
@@ -185,24 +218,22 @@ fn handle_stt_shortcut(app_handle: &AppHandle, shortcut_state: ShortcutState) ->
                 }
             }
         }
-        RecordingMode::PushToTalk => {
-            match shortcut_state {
-                ShortcutState::Pressed => {
-                    if current_status == crate::state::AppStatus::Idle {
-                        play_feedback_sound(app_handle, "start");
-                        crate::commands::stt::do_start_recording(app_handle)?;
-                    }
-                }
-                ShortcutState::Released => {
-                    if current_status == crate::state::AppStatus::Recording
-                        || current_status == crate::state::AppStatus::Loading
-                    {
-                        play_feedback_sound(app_handle, "stop");
-                        stop_recording(app_handle);
-                    }
+        RecordingMode::PushToTalk => match shortcut_state {
+            ShortcutState::Pressed => {
+                if current_status == crate::state::AppStatus::Idle {
+                    play_feedback_sound(app_handle, "start");
+                    crate::commands::stt::do_start_recording(app_handle)?;
                 }
             }
-        }
+            ShortcutState::Released => {
+                if current_status == crate::state::AppStatus::Recording
+                    || current_status == crate::state::AppStatus::Loading
+                {
+                    play_feedback_sound(app_handle, "stop");
+                    stop_recording(app_handle);
+                }
+            }
+        },
     }
 
     Ok(())

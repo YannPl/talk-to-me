@@ -44,8 +44,8 @@
         <div class="step-content">
             <h1>Choose a transcription model</h1>
             <p class="subtitle">Models run locally on your Mac. Pick one to get started.</p>
-            <div id="onboarding-catalog" class="model-list"></div>
             <div id="onboarding-installed" class="installed-status"></div>
+            <div id="onboarding-catalog" class="model-list"></div>
         </div>
         <div class="step-actions">
             <button class="btn-secondary" id="btn-model-back">Back</button>
@@ -53,21 +53,10 @@
         </div>
     </section>
 
-    <!-- Step 3: Accessibility + Shortcut -->
+    <!-- Step 3: Accessibility -->
     <section class="wizard-step" id="step-accessibility">
         <div class="step-content">
-            <h1>Permissions &amp; Shortcut</h1>
-
-            <div class="setting-group">
-                <h3>Dictation Shortcut</h3>
-                <p class="setting-desc">Choose which key combination triggers dictation.</p>
-                <select id="onboarding-shortcut">
-                    <option value="Alt+Space">&#x2325; Space</option>
-                    <option value="Ctrl+Space">&#x2303; Space</option>
-                    <option value="Super+Shift+Space">&#x2318;&#x21E7; Space</option>
-                    <option value="RightCommand">Right &#x2318;</option>
-                </select>
-            </div>
+            <h1>Permissions</h1>
 
             <div class="setting-group">
                 <h3>Accessibility Permission</h3>
@@ -92,6 +81,17 @@
     <section class="wizard-step" id="step-test">
         <div class="step-content">
             <h1>Try it out!</h1>
+
+            <div class="setting-group shortcut-picker">
+                <label for="onboarding-shortcut">Dictation shortcut</label>
+                <select id="onboarding-shortcut">
+                    <option value="Alt+Space">&#x2325; Space</option>
+                    <option value="Ctrl+Space">&#x2303; Space</option>
+                    <option value="Super+Shift+Space">&#x2318;&#x21E7; Space</option>
+                    <option value="RightCommand">Right &#x2318;</option>
+                </select>
+            </div>
+
             <p class="subtitle" id="test-instruction">Press <strong id="test-shortcut-label">&#x2325;Space</strong> to start dictating, then press again to stop.</p>
             <div id="test-area" class="test-area">
                 <div id="test-status" class="test-status">Ready</div>
@@ -100,6 +100,9 @@
             <div id="mic-error" class="error-banner" style="display:none;">
                 <span id="mic-error-text"></span>
                 <button class="btn-secondary btn-small" id="btn-open-mic-prefs">Open System Preferences</button>
+            </div>
+            <div id="shortcut-error" class="error-banner" style="display:none;">
+                <span id="shortcut-error-text"></span>
             </div>
         </div>
         <div class="step-actions">
