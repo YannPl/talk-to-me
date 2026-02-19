@@ -431,6 +431,8 @@ pub async fn do_stop_recording(app_handle: &AppHandle) -> Result<String> {
         "duration_ms": result.duration_ms,
     }));
 
+    reset_idle_timer(app_handle);
+
     let handle_for_hide = app_handle.clone();
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(500));
@@ -490,6 +492,8 @@ pub fn do_cancel_recording(app_handle: &AppHandle) -> Result<()> {
     std::thread::spawn(move || {
         unregister_cancel_shortcut(&handle);
     });
+
+    reset_idle_timer(app_handle);
 
     tracing::info!("Recording cancelled");
     Ok(())
