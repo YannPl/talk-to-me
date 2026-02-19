@@ -29,6 +29,17 @@
         "visible": false,
         "resizable": false,
         "shadow": false
+      },
+      {
+        "label": "onboarding",
+        "url": "onboarding.html",
+        "title": "Talk to Me",
+        "width": 600,
+        "height": 500,
+        "resizable": false,
+        "center": true,
+        "decorations": true,
+        "visible": false
       }
     ],
     "security": {

@@ -58,6 +58,7 @@ async function saveSettings() {
             general: {
                 launch_at_login: document.getElementById('launch-at-login').checked,
                 sound_feedback: document.getElementById('sound-feedback').checked,
+                onboarding_completed: true,
             },
         };
         await api.updateSettings(settings);

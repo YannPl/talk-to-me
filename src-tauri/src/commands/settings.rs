@@ -84,3 +84,26 @@ pub fn get_stt_shortcut_label(app_handle: AppHandle) -> String {
 pub fn get_app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
+
+#[tauri::command]
+pub fn complete_onboarding(app_handle: AppHandle) -> Result<(), String> {
+    let state = app_handle.state::<AppState>();
+    state.settings.lock().unwrap().general.onboarding_completed = true;
+    crate::persistence::save_settings(&app_handle);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn check_microphone_permission() -> Result<bool, String> {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let host = cpal::default_host();
+    match host.default_input_device() {
+        Some(device) => {
+            match device.default_input_config() {
+                Ok(_) => Ok(true),
+                Err(_) => Ok(false),
+            }
+        }
+        None => Ok(false),
+    }
+}

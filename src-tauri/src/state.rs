@@ -166,6 +166,8 @@ impl Default for TtsSettings {
 pub struct GeneralSettings {
     pub launch_at_login: bool,
     pub sound_feedback: bool,
+    #[serde(default)]
+    pub onboarding_completed: bool,
 }
 
 impl Default for GeneralSettings {
@@ -173,6 +175,7 @@ impl Default for GeneralSettings {
         Self {
             launch_at_login: false,
             sound_feedback: true,
+            onboarding_completed: false,
         }
     }
 }

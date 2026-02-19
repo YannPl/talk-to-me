@@ -38,6 +38,9 @@ export const requestAccessibilityPermission = () => invoke('request_accessibilit
 export const getSttShortcutLabel = () => invoke('get_stt_shortcut_label');
 export const getAppVersion = () => invoke('get_app_version');
 
+export const completeOnboarding = () => invoke('complete_onboarding');
+export const checkMicrophonePermission = () => invoke('check_microphone_permission');
+
 export const onDownloadProgress = (callback) => listen('download-progress', (e) => callback(e.payload));
 export const onDownloadComplete = (callback) => listen('download-complete', (e) => callback(e.payload));
 export const onDownloadError = (callback) => listen('download-error', (e) => callback(e.payload));
@@ -51,3 +54,4 @@ export const onPlaybackStatus = (callback) => listen('playback-status', (e) => c
 export const onPlaybackProgress = (callback) => listen('playback-progress', (e) => callback(e.payload));
 export const onSttShortcutChanged = (callback) => listen('stt-shortcut-changed', (e) => callback(e.payload));
 export const onNavigateTab = (callback) => listen('navigate-tab', (e) => callback(e.payload));
+export const onPermissionMissing = (callback) => listen('permission-missing', (e) => callback(e.payload));
