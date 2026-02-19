@@ -61,6 +61,15 @@ pub fn get_status(app_handle: AppHandle) -> Result<String, String> {
 pub fn do_start_recording(app_handle: &AppHandle) -> Result<()> {
     let state = app_handle.state::<AppState>();
 
+    let engine_loaded = state.active_stt_engine.lock().unwrap().is_some();
+    let model_id = state.settings.lock().unwrap().stt.active_model_id.clone();
+
+    if !engine_loaded && model_id.is_none() {
+        anyhow::bail!("No STT model selected. Please select a model in Settings.");
+    }
+
+    cancel_idle_timer(app_handle);
+
     let (monitor, drain) = {
         let mut status = state.status.lock().unwrap();
         if *status != AppStatus::Idle {
@@ -73,7 +82,12 @@ pub fn do_start_recording(app_handle: &AppHandle) -> Result<()> {
         let monitor = capture.level_monitor();
         let drain = capture.streaming_drain();
         *capture_guard = Some(capture);
-        *status = AppStatus::Recording;
+
+        if engine_loaded {
+            *status = AppStatus::Recording;
+        } else {
+            *status = AppStatus::Loading;
+        }
         (monitor, drain)
     };
 
@@ -82,7 +96,6 @@ pub fn do_start_recording(app_handle: &AppHandle) -> Result<()> {
         *streaming = Some(StreamingState::default());
     }
 
-    // Audio level monitor thread
     let handle = app_handle.clone();
     std::thread::spawn(move || {
         while monitor.is_active() {
@@ -92,9 +105,32 @@ pub fn do_start_recording(app_handle: &AppHandle) -> Result<()> {
         }
     });
 
-    // Streaming transcription thread
     let handle_streaming = app_handle.clone();
+    let needs_load = !engine_loaded;
+    let model_id_for_load = model_id;
     let streaming_handle = std::thread::spawn(move || {
+        if needs_load {
+            if let Some(ref mid) = model_id_for_load {
+                tracing::info!("Lazy-loading STT engine for model: {}", mid);
+                match crate::commands::models::load_stt_engine(&handle_streaming, mid) {
+                    Ok(()) => {
+                        tracing::info!("STT engine loaded successfully");
+                        let state = handle_streaming.state::<AppState>();
+                        *state.status.lock().unwrap() = AppStatus::Recording;
+                        let _ = handle_streaming.emit("recording-status",
+                            serde_json::json!({"status": "recording"}));
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to lazy-load STT engine: {}", e);
+                        let state = handle_streaming.state::<AppState>();
+                        *state.status.lock().unwrap() = AppStatus::Idle;
+                        let _ = handle_streaming.emit("recording-status",
+                            serde_json::json!({"status": "idle"}));
+                        return;
+                    }
+                }
+            }
+        }
         streaming_transcription_loop(handle_streaming, drain);
     });
     {
@@ -106,7 +142,11 @@ pub fn do_start_recording(app_handle: &AppHandle) -> Result<()> {
         let _ = window.show();
     }
 
-    let _ = app_handle.emit("recording-status", serde_json::json!({"status": "recording"}));
+    if engine_loaded {
+        let _ = app_handle.emit("recording-status", serde_json::json!({"status": "recording"}));
+    } else {
+        let _ = app_handle.emit("recording-status", serde_json::json!({"status": "loading"}));
+    }
     let _ = app_handle.emit("overlay-mode", serde_json::json!({"mode": "stt"}));
 
     let handle_for_shortcut = app_handle.clone();
@@ -114,7 +154,7 @@ pub fn do_start_recording(app_handle: &AppHandle) -> Result<()> {
         register_cancel_shortcut(&handle_for_shortcut);
     });
 
-    tracing::info!("Recording started");
+    tracing::info!("Recording started (engine_loaded={})", engine_loaded);
     Ok(())
 }
 
