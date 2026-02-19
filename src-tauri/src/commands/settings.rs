@@ -13,10 +13,9 @@ pub fn update_settings(app_handle: AppHandle, settings: Settings) -> Result<(), 
     let state = app_handle.state::<AppState>();
     let mut current = state.settings.lock().unwrap();
 
-    // Preserve active_model_id fields — these are managed by set_active_model/delete_model,
-    // not by the frontend settings form (which sends null)
     let stt_active = current.stt.active_model_id.clone();
     let tts_active = current.tts.active_model_id.clone();
+    let old_timeout = current.stt.model_idle_timeout_s;
 
     *current = settings;
 
@@ -27,9 +26,39 @@ pub fn update_settings(app_handle: AppHandle, settings: Settings) -> Result<(), 
         current.tts.active_model_id = tts_active;
     }
 
-    drop(current); // release lock before save_settings re-acquires it
+    let new_timeout = current.stt.model_idle_timeout_s;
+    drop(current);
+
     crate::persistence::save_settings(&app_handle);
+
+    if old_timeout != new_timeout {
+        if new_timeout.is_none() {
+            crate::commands::stt::cancel_idle_timer(&app_handle);
+            let model_id = state.settings.lock().unwrap().stt.active_model_id.clone();
+            if let Some(ref mid) = model_id {
+                let engine_loaded = state.active_stt_engine.lock().unwrap().is_some();
+                if !engine_loaded {
+                    if let Err(e) = crate::commands::models::load_stt_engine(&app_handle, mid) {
+                        tracing::warn!("Failed to eagerly load engine after disabling idle timeout: {}", e);
+                    }
+                }
+            }
+        } else {
+            crate::commands::stt::reset_idle_timer(&app_handle);
+        }
+    }
+
     Ok(())
+}
+
+#[tauri::command]
+pub fn update_stt_shortcut(app_handle: AppHandle, shortcut: String) -> Result<(), String> {
+    let state = app_handle.state::<AppState>();
+    let status = state.status.lock().unwrap().clone();
+    if status == crate::state::AppStatus::Recording {
+        return Err("Cannot change shortcut while recording".to_string());
+    }
+    crate::hotkey::update_stt_shortcut(&app_handle, &shortcut).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
