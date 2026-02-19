@@ -821,6 +821,39 @@ select option {
     pointer-events: none;
 }
 
+/* --- Permission Banner --- */
+.permission-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 159, 10, 0.15);
+    border-bottom: 1px solid rgba(255, 159, 10, 0.3);
+    font-size: 12px;
+    color: var(--accent-orange);
+    flex-shrink: 0;
+}
+
+.permission-banner .btn-small {
+    font-size: 11px;
+    padding: 3px 8px;
+}
+
+.btn-dismiss {
+    font-family: var(--font-stack);
+    font-size: 14px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    margin-left: auto;
+    padding: 2px 6px;
+}
+
+.btn-dismiss:hover {
+    color: var(--text-primary);
+}
+
 /* --- Responsive within the 550x450 window --- */
 @media (max-height: 400px) {
     .tab-bar {

@@ -367,3 +367,20 @@ document.addEventListener('DOMContentLoaded', () => {
     loadInstalled();
     loadVersion();
 });
+
+api.onPermissionMissing((data) => {
+    const banner = document.getElementById('permission-banner');
+    const text = document.getElementById('permission-banner-text');
+    const btn = document.getElementById('permission-banner-btn');
+
+    if (data.permission === 'accessibility') {
+        text.textContent = 'Accessibility permission is disabled. Text will be copied to clipboard instead of typed.';
+        btn.textContent = 'Open Preferences';
+        btn.onclick = () => api.requestAccessibilityPermission();
+    }
+    banner.style.display = 'flex';
+});
+
+document.getElementById('permission-banner-dismiss')?.addEventListener('click', () => {
+    document.getElementById('permission-banner').style.display = 'none';
+});

@@ -273,6 +273,39 @@ pub fn run() {
                 });
             }
 
+            if let Some(window) = app.get_webview_window("onboarding") {
+                let w = window.clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = w.hide();
+                    }
+                });
+            }
+
+            // Show onboarding wizard on first launch, otherwise check permissions
+            {
+                let state = app.state::<AppState>();
+                let onboarding_completed = state.settings.lock().unwrap().general.onboarding_completed;
+
+                if !onboarding_completed {
+                    if let Some(window) = app.get_webview_window("onboarding") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                } else {
+                    let accessibility_ok = {
+                        let injector = platform::get_text_injector();
+                        injector.is_accessibility_granted()
+                    };
+                    if !accessibility_ok {
+                        let _ = app.emit("permission-missing", serde_json::json!({
+                            "permission": "accessibility"
+                        }));
+                    }
+                }
+            }
+
             tracing::info!("App setup complete");
 
             Ok(())
