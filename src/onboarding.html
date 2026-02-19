@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Talk to Me</title>
+    <link rel="stylesheet" href="styles/onboarding.css">
+</head>
+<body>
+    <!-- Progress indicator -->
+    <div class="wizard-progress">
+        <div class="progress-step active" data-step="1">1</div>
+        <div class="progress-line"></div>
+        <div class="progress-step" data-step="2">2</div>
+        <div class="progress-line"></div>
+        <div class="progress-step" data-step="3">3</div>
+        <div class="progress-line"></div>
+        <div class="progress-step" data-step="4">4</div>
+    </div>
+
+    <!-- Step 1: Welcome -->
+    <section class="wizard-step active" id="step-welcome">
+        <div class="step-content">
+            <h1>Welcome to Talk to Me</h1>
+            <p class="subtitle">Local speech-to-text for macOS. Your voice stays on your Mac.</p>
+            <p class="description">Let's set up a few things so you can start dictating right away.</p>
+        </div>
+        <div class="step-actions">
+            <button class="btn-primary" id="btn-start">Get Started</button>
+        </div>
+    </section>
+
+    <!-- Step 2: Model Download -->
+    <section class="wizard-step" id="step-model">
+        <div class="step-content">
+            <h1>Choose a transcription model</h1>
+            <p class="subtitle">Models run locally on your Mac. Pick one to get started.</p>
+            <div id="onboarding-catalog" class="model-list"></div>
+            <div id="onboarding-installed" class="installed-status"></div>
+        </div>
+        <div class="step-actions">
+            <button class="btn-secondary" id="btn-model-back">Back</button>
+            <button class="btn-primary" id="btn-model-next" disabled>Next</button>
+        </div>
+    </section>
+
+    <!-- Step 3: Accessibility + Shortcut -->
+    <section class="wizard-step" id="step-accessibility">
+        <div class="step-content">
+            <h1>Permissions &amp; Shortcut</h1>
+
+            <div class="setting-group">
+                <h3>Dictation Shortcut</h3>
+                <p class="setting-desc">Choose which key combination triggers dictation.</p>
+                <select id="onboarding-shortcut">
+                    <option value="Alt+Space">&#x2325; Space</option>
+                    <option value="Ctrl+Space">&#x2303; Space</option>
+                    <option value="Super+Shift+Space">&#x2318;&#x21E7; Space</option>
+                    <option value="RightCommand">Right &#x2318;</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <h3>Accessibility Permission</h3>
+                <p class="setting-desc">Talk to Me needs Accessibility permission to type the transcribed text into your apps.</p>
+                <div class="permission-row">
+                    <span id="accessibility-indicator" class="permission-indicator pending">Checking...</span>
+                    <button class="btn-secondary" id="btn-grant-accessibility">Grant Permission</button>
+                </div>
+                <p class="permission-skip-hint" id="accessibility-skip-hint" style="display:none;">
+                    Without this, text will be copied to your clipboard instead of typed automatically.
+                </p>
+            </div>
+        </div>
+        <div class="step-actions">
+            <button class="btn-secondary" id="btn-access-back">Back</button>
+            <button class="btn-primary" id="btn-access-next">Next</button>
+            <button class="btn-text" id="btn-access-skip" style="display:none;">Skip for now</button>
+        </div>
+    </section>
+
+    <!-- Step 4: Test -->
+    <section class="wizard-step" id="step-test">
+        <div class="step-content">
+            <h1>Try it out!</h1>
+            <p class="subtitle" id="test-instruction">Press <strong id="test-shortcut-label">&#x2325;Space</strong> to start dictating, then press again to stop.</p>
+            <div id="test-area" class="test-area">
+                <div id="test-status" class="test-status">Ready</div>
+                <div id="test-result" class="test-result"></div>
+            </div>
+            <div id="mic-error" class="error-banner" style="display:none;">
+                <span id="mic-error-text"></span>
+                <button class="btn-secondary btn-small" id="btn-open-mic-prefs">Open System Preferences</button>
+            </div>
+        </div>
+        <div class="step-actions">
+            <button class="btn-secondary" id="btn-test-back">Back</button>
+            <button class="btn-primary" id="btn-finish">Finish</button>
+        </div>
+    </section>
+
+    <script type="module" src="scripts/onboarding.js"></script>
+</body>
+</html>
