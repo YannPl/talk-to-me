@@ -42,6 +42,7 @@ pub fn run() {
             commands::tts::stop_speaking,
             commands::settings::get_settings,
             commands::settings::update_settings,
+            commands::settings::update_stt_shortcut,
             commands::settings::check_accessibility_permission,
             commands::settings::request_accessibility_permission,
             commands::settings::get_app_version,
@@ -51,11 +52,24 @@ pub fn run() {
             {
                 use objc2_app_kit::NSApplication;
                 use objc2_app_kit::NSApplicationActivationPolicy;
-                // Safety: Tauri's setup closure runs on the main thread
                 let mtm = unsafe { objc2::MainThreadMarker::new_unchecked() };
                 let ns_app = NSApplication::sharedApplication(mtm);
                 ns_app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
             }
+
+            // Load settings before tray construction so we can read the saved shortcut
+            let loaded = persistence::load_settings(app.handle());
+            let saved_shortcut = loaded.shortcuts.stt.clone();
+            {
+                let state = app.state::<AppState>();
+                *state.settings.lock().unwrap() = loaded;
+                tracing::info!("Settings loaded from store");
+            }
+
+            let shortcut_label = format!(
+                "  Shortcut: {}",
+                hotkey::shortcut_display_label(&saved_shortcut)
+            );
 
             let show_settings = MenuItem::with_id(
                 app,
@@ -81,10 +95,16 @@ pub fn run() {
             let stt_shortcut = MenuItem::with_id(
                 app,
                 "stt_shortcut",
-                "  Shortcut: \u{2325}Space",
+                &shortcut_label,
                 false,
                 None::<&str>,
             )?;
+
+            // Store the menu item handle so hotkey::update_stt_shortcut can update it later
+            {
+                let state = app.state::<AppState>();
+                *state.tray_stt_shortcut_item.lock().unwrap() = Some(stt_shortcut.clone());
+            }
 
             let tts_header = MenuItem::with_id(
                 app,
@@ -175,15 +195,11 @@ pub fn run() {
             }
 
             {
-                let loaded = persistence::load_settings(app.handle());
                 let state = app.state::<AppState>();
-                *state.settings.lock().unwrap() = loaded;
-                tracing::info!("Settings loaded from store");
-            }
-
-            {
-                let state = app.state::<AppState>();
-                let active_model_id = state.settings.lock().unwrap().stt.active_model_id.clone();
+                let settings = state.settings.lock().unwrap();
+                let active_model_id = settings.stt.active_model_id.clone();
+                let idle_timeout = settings.stt.model_idle_timeout_s;
+                drop(settings);
 
                 if let Some(ref model_id) = active_model_id {
                     let installed = hub::registry::list_installed_models(Some(
@@ -191,17 +207,24 @@ pub fn run() {
                     ));
                     match installed {
                         Ok(models) if models.iter().any(|m| m.id == *model_id) => {
-                            match commands::models::load_stt_engine(app.handle(), model_id) {
-                                Ok(()) => tracing::info!("Auto-loaded STT model: {}", model_id),
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "Failed to auto-load STT model '{}': {}. Clearing.",
-                                        model_id,
-                                        e
-                                    );
-                                    state.settings.lock().unwrap().stt.active_model_id = None;
-                                    persistence::save_settings(app.handle());
+                            if idle_timeout.is_none() {
+                                match commands::models::load_stt_engine(app.handle(), model_id) {
+                                    Ok(()) => tracing::info!("Auto-loaded STT model: {}", model_id),
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            "Failed to auto-load STT model '{}': {}. Clearing.",
+                                            model_id,
+                                            e
+                                        );
+                                        state.settings.lock().unwrap().stt.active_model_id = None;
+                                        persistence::save_settings(app.handle());
+                                    }
                                 }
+                            } else {
+                                tracing::info!(
+                                    "Idle timeout enabled ({}s) — deferring STT model load: {}",
+                                    idle_timeout.unwrap(), model_id
+                                );
                             }
                         }
                         Ok(_) => {
@@ -219,23 +242,23 @@ pub fn run() {
                 }
             }
 
-            use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut};
-
-            let shortcut: Shortcut = "Alt+Space".parse().expect("Failed to parse shortcut");
-            let app_handle = app.handle().clone();
-
-            app.global_shortcut()
-                .on_shortcut(shortcut, move |_app, _shortcut, event| {
-                    if let Err(e) = hotkey::handle_hotkey(
-                        &app_handle,
-                        hotkey::HotkeyAction::ToggleStt,
-                        event.state,
-                    ) {
-                        tracing::error!("Hotkey error: {}", e);
+            // Register the saved shortcut, falling back to Alt+Space on failure
+            if let Err(e) = hotkey::register_stt_shortcut(app.handle(), &saved_shortcut) {
+                tracing::warn!(
+                    "Failed to register saved shortcut '{}': {}. Falling back to Alt+Space.",
+                    saved_shortcut,
+                    e
+                );
+                if saved_shortcut != "Alt+Space" {
+                    if let Err(e2) = hotkey::register_stt_shortcut(app.handle(), "Alt+Space") {
+                        tracing::error!("Failed to register fallback shortcut Alt+Space: {}", e2);
+                    } else {
+                        let state = app.state::<AppState>();
+                        state.settings.lock().unwrap().shortcuts.stt = "Alt+Space".to_string();
+                        persistence::save_settings(app.handle());
                     }
-                })?;
-
-            tracing::info!("Global shortcut registered: Alt+Space for STT");
+                }
+            }
 
             if let Some(window) = app.get_webview_window("main") {
                 let w = window.clone();
