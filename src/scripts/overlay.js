@@ -4,6 +4,7 @@ const overlay = document.getElementById('overlay');
 const modeStt = document.getElementById('mode-stt');
 const modeTranscribing = document.getElementById('mode-transcribing');
 const modeTts = document.getElementById('mode-tts');
+const modeLoading = document.getElementById('mode-loading');
 const sttStatus = document.getElementById('stt-status');
 
 const BAR_COUNT = 48;
@@ -29,10 +30,15 @@ function showMode(mode) {
     previousMode = mode;
 
     modeStt.classList.add('hidden');
+    modeLoading.classList.add('hidden');
     modeTranscribing.classList.add('hidden');
     modeTts.classList.add('hidden');
 
     switch (mode) {
+        case 'loading':
+            modeLoading.classList.remove('hidden');
+            overlay.classList.add('visible');
+            break;
         case 'recording':
             modeStt.classList.remove('hidden');
             sttStatus.textContent = 'Listening...';
