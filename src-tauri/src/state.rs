@@ -12,6 +12,7 @@ pub type CancelFlag = Arc<AtomicBool>;
 #[serde(rename_all = "snake_case")]
 pub enum AppStatus {
     Idle,
+    Loading,
     Recording,
     Transcribing,
     Synthesizing,
@@ -42,6 +43,8 @@ pub struct AppState {
     pub download_cancels: Mutex<HashMap<String, CancelFlag>>,
     pub streaming_state: Mutex<Option<StreamingState>>,
     pub streaming_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
+    pub tray_stt_shortcut_item: Mutex<Option<tauri::menu::MenuItem<tauri::Wry>>>,
+    pub idle_timer_abort: Mutex<Option<tokio::task::AbortHandle>>,
 }
 
 impl AppState {
@@ -55,6 +58,8 @@ impl AppState {
             download_cancels: Mutex::new(HashMap::new()),
             streaming_state: Mutex::new(None),
             streaming_thread: Mutex::new(None),
+            tray_stt_shortcut_item: Mutex::new(None),
+            idle_timer_abort: Mutex::new(None),
         }
     }
 }
@@ -87,10 +92,14 @@ pub struct ShortcutSettings {
 impl Default for ShortcutSettings {
     fn default() -> Self {
         Self {
-            stt: "Option+Space".to_string(),
-            tts: "Option+Shift+Space".to_string(),
+            stt: "Alt+Space".to_string(),
+            tts: "Alt+Shift+Space".to_string(),
         }
     }
+}
+
+fn default_idle_timeout() -> Option<u64> {
+    Some(300)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,6 +109,8 @@ pub struct SttSettings {
     #[serde(default)]
     pub recording_mode: RecordingMode,
     pub active_model_id: Option<String>,
+    #[serde(default = "default_idle_timeout")]
+    pub model_idle_timeout_s: Option<u64>,
 }
 
 impl Default for SttSettings {
@@ -109,6 +120,7 @@ impl Default for SttSettings {
             injection_mode: InjectionMode::Clipboard,
             recording_mode: RecordingMode::default(),
             active_model_id: None,
+            model_idle_timeout_s: Some(300),
         }
     }
 }
