@@ -82,13 +82,7 @@ body {
     -webkit-app-region: drag;
 }
 
-.wizard-progress .step-indicator {
-    display: flex;
-    align-items: center;
-    -webkit-app-region: no-drag;
-}
-
-.wizard-progress .step-circle {
+.wizard-progress .progress-step {
     width: 28px;
     height: 28px;
     border-radius: 50%;
@@ -104,21 +98,21 @@ body {
     border: 2px solid var(--border-color);
 }
 
-.wizard-progress .step-circle.active {
+.wizard-progress .progress-step.active {
     background: var(--accent-blue);
     color: #FFFFFF;
     border-color: var(--accent-blue);
     box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
 }
 
-.wizard-progress .step-circle.completed {
+.wizard-progress .progress-step.completed {
     background: var(--accent-green);
     color: #FFFFFF;
     border-color: var(--accent-green);
     animation: stepComplete 300ms ease-out;
 }
 
-.wizard-progress .step-line {
+.wizard-progress .progress-line {
     width: 40px;
     height: 2px;
     background: var(--border-color);
@@ -126,7 +120,7 @@ body {
     transition: background var(--transition-normal);
 }
 
-.wizard-progress .step-line.completed {
+.wizard-progress .progress-line.completed {
     background: var(--accent-green);
 }
 
@@ -179,6 +173,11 @@ body {
     padding: 16px 32px;
     flex-shrink: 0;
     border-top: 1px solid var(--border-subtle);
+}
+
+/* --- App Icon --- */
+.app-icon {
+    margin-bottom: 16px;
 }
 
 /* --- Typography --- */
@@ -459,6 +458,16 @@ button:disabled {
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
+}
+
+/* --- Empty State --- */
+.empty-state {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    text-align: center;
+    padding: 20px 12px;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-md);
 }
 
 /* --- Installed Status --- */

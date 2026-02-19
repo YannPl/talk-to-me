@@ -21,6 +21,15 @@
     <!-- Step 1: Welcome -->
     <section class="wizard-step active" id="step-welcome">
         <div class="step-content">
+            <div class="app-icon">
+                <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="64" height="64" rx="14" fill="#007AFF"/>
+                    <path d="M32 12a6 6 0 0 0-6 6v14a6 6 0 0 0 12 0V18a6 6 0 0 0-6-6z" fill="white"/>
+                    <path d="M20 30a12 12 0 0 0 24 0" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="32" y1="42" x2="32" y2="50" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="26" y1="50" x2="38" y2="50" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+            </div>
             <h1>Welcome to Talk to Me</h1>
             <p class="subtitle">Local speech-to-text for macOS. Your voice stays on your Mac.</p>
             <p class="description">Let's set up a few things so you can start dictating right away.</p>
@@ -74,7 +83,7 @@
         </div>
         <div class="step-actions">
             <button class="btn-secondary" id="btn-access-back">Back</button>
-            <button class="btn-primary" id="btn-access-next">Next</button>
+            <button class="btn-primary" id="btn-access-next" disabled>Next</button>
             <button class="btn-text" id="btn-access-skip" style="display:none;">Skip for now</button>
         </div>
     </section>

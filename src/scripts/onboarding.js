@@ -246,18 +246,22 @@ async function checkAccessibilityNow() {
         const skipHint = document.getElementById('accessibility-skip-hint');
         const skipBtn = document.getElementById('btn-access-skip');
 
+        const nextBtn = document.getElementById('btn-access-next');
+
         if (granted) {
             indicator.textContent = 'Accessibility granted';
             indicator.className = 'permission-indicator granted';
             grantBtn.style.display = 'none';
             skipHint.style.display = 'none';
             skipBtn.style.display = 'none';
+            nextBtn.disabled = false;
         } else {
             indicator.textContent = 'Permission required';
             indicator.className = 'permission-indicator denied';
             grantBtn.style.display = 'inline-block';
             skipHint.style.display = 'block';
             skipBtn.style.display = 'inline-block';
+            nextBtn.disabled = true;
         }
     } catch (e) {
         console.error('Failed to check accessibility:', e);
@@ -371,6 +375,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('btn-test-back').addEventListener('click', () => goToStep(3));
     document.getElementById('btn-finish').addEventListener('click', async () => {
         await api.completeOnboarding();
+        try {
+            const label = await api.getSttShortcutLabel();
+            const { sendNotification } = window.__TAURI__.notification;
+            sendNotification({
+                title: 'Talk to Me is ready!',
+                body: `Use ${label} to dictate.`,
+            });
+        } catch (e) {
+            console.error('Failed to send notification:', e);
+        }
         const { getCurrentWindow } = window.__TAURI__.window;
         await getCurrentWindow().close();
     });
@@ -380,6 +394,4 @@ document.addEventListener('DOMContentLoaded', async () => {
             'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
         );
     });
-
-    await loadCatalog();
 });
