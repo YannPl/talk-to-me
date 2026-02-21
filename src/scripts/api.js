@@ -43,6 +43,7 @@ export const finishOnboarding = () => invoke('finish_onboarding');
 export const rerunOnboarding = () => invoke('rerun_onboarding');
 export const retrySttShortcut = () => invoke('retry_stt_shortcut');
 export const checkMicrophonePermission = () => invoke('check_microphone_permission');
+export const requestMicrophonePermission = () => invoke('request_microphone_permission');
 
 export const onDownloadProgress = (callback) => listen('download-progress', (e) => callback(e.payload));
 export const onDownloadComplete = (callback) => listen('download-complete', (e) => callback(e.payload));

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use super::{TextInjector, TextSelector};
+use super::{TextInjector, TextSelector, MediaController};
 
 type CGEventRef = *mut std::ffi::c_void;
 
@@ -70,13 +70,17 @@ impl TextInjector for MacOsTextInjector {
 
     fn inject_via_clipboard(&self, text: &str) -> Result<()> {
         copy_to_clipboard(text)?;
-        if self.is_accessibility_granted() {
+        let trusted = self.is_accessibility_granted();
+        tracing::info!("AXIsProcessTrusted() = {}, attempting text injection ({} chars)", trusted, text.len());
+        if trusted {
             std::thread::sleep(std::time::Duration::from_millis(50));
             if let Err(e) = simulate_cmd_v() {
                 tracing::warn!("CGEvent Cmd+V failed: {}. Text is in clipboard.", e);
+            } else {
+                tracing::info!("Cmd+V simulated successfully");
             }
         } else {
-            tracing::info!("Accessibility not granted — text copied to clipboard, paste manually with Cmd+V");
+            tracing::warn!("Accessibility not granted — text copied to clipboard but cannot auto-paste. Grant permission in System Settings > Privacy & Security > Accessibility.");
         }
         Ok(())
     }
@@ -90,6 +94,67 @@ impl TextInjector for MacOsTextInjector {
             .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
             .spawn()?;
         Ok(())
+    }
+}
+
+use std::ffi::c_void;
+use std::sync::OnceLock;
+
+const _MR_COMMAND_PLAY: u32 = 0;
+const MR_COMMAND_PAUSE: u32 = 1;
+
+type MRSendCommandFn = unsafe extern "C" fn(command: u32, options: *const c_void) -> bool;
+
+struct MediaRemote {
+    send_command: MRSendCommandFn,
+}
+
+static MEDIA_REMOTE: OnceLock<Option<MediaRemote>> = OnceLock::new();
+
+fn media_remote() -> Option<&'static MediaRemote> {
+    MEDIA_REMOTE.get_or_init(|| {
+        unsafe {
+            let path = c"/System/Library/PrivateFrameworks/MediaRemote.framework/MediaRemote";
+            let handle = libc::dlopen(path.as_ptr(), libc::RTLD_LAZY);
+            if handle.is_null() {
+                tracing::warn!("Failed to load MediaRemote framework");
+                return None;
+            }
+            let sym = libc::dlsym(handle, c"MRMediaRemoteSendCommand".as_ptr());
+            if sym.is_null() {
+                tracing::warn!("MRMediaRemoteSendCommand not found");
+                return None;
+            }
+            tracing::info!("MediaRemote framework loaded");
+            Some(MediaRemote {
+                send_command: std::mem::transmute(sym),
+            })
+        }
+    }).as_ref()
+}
+
+pub struct MacOsMediaController;
+
+static MEDIA_CONTROLLER: OnceLock<MacOsMediaController> = OnceLock::new();
+
+impl MacOsMediaController {
+    pub fn instance() -> &'static Self {
+        MEDIA_CONTROLLER.get_or_init(|| MacOsMediaController)
+    }
+}
+
+impl MediaController for MacOsMediaController {
+    fn pause_if_playing(&self) {
+        if let Some(mr) = media_remote() {
+            let ok = unsafe { (mr.send_command)(MR_COMMAND_PAUSE, std::ptr::null()) };
+            tracing::info!("MediaRemote pause sent (ok={})", ok);
+        }
+    }
+
+    fn resume(&self) {
+        // No-op: we intentionally don't resume media. Sending play would start
+        // music even when nothing was playing before recording, which is worse
+        // than leaving paused media paused.
     }
 }
 

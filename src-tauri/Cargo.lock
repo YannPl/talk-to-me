@@ -4457,6 +4457,7 @@ dependencies = [
  "dirs 5.0.1",
  "futures-util",
  "hound",
+ "libc",
  "objc2",
  "objc2-app-kit",
  "ort",

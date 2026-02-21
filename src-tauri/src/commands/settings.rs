@@ -134,6 +134,15 @@ pub fn retry_stt_shortcut(app_handle: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn request_microphone_permission() -> Result<(), String> {
+    std::process::Command::new("open")
+        .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub fn check_microphone_permission() -> Result<bool, String> {
     use cpal::traits::{DeviceTrait, HostTrait};
     let host = cpal::default_host();

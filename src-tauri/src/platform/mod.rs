@@ -17,6 +17,11 @@ pub trait TextSelector: Send + Sync {
     fn is_supported(&self) -> bool;
 }
 
+pub trait MediaController: Send + Sync {
+    fn pause_if_playing(&self);
+    fn resume(&self);
+}
+
 pub fn get_text_injector() -> Box<dyn TextInjector> {
     #[cfg(target_os = "macos")]
     {
@@ -25,5 +30,16 @@ pub fn get_text_injector() -> Box<dyn TextInjector> {
     #[cfg(not(target_os = "macos"))]
     {
         panic!("Text injection not supported on this platform")
+    }
+}
+
+pub fn get_media_controller() -> &'static dyn MediaController {
+    #[cfg(target_os = "macos")]
+    {
+        MacOsMediaController::instance()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        panic!("Media control not supported on this platform")
     }
 }

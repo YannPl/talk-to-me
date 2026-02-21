@@ -178,6 +178,12 @@ fn get_sound_paths() -> &'static SoundPaths {
     })
 }
 
+fn pause_system_media() {
+    tracing::info!("Checking system media before recording...");
+    let mc = crate::platform::get_media_controller();
+    mc.pause_if_playing();
+}
+
 fn play_feedback_sound(app_handle: &AppHandle, sound: &str) {
     let state = app_handle.state::<crate::state::AppState>();
     if !state.settings.lock().unwrap().general.sound_feedback {
@@ -206,6 +212,7 @@ fn handle_stt_shortcut(app_handle: &AppHandle, shortcut_state: ShortcutState) ->
             }
             match current_status {
                 crate::state::AppStatus::Idle => {
+                    pause_system_media();
                     play_feedback_sound(app_handle, "start");
                     crate::commands::stt::do_start_recording(app_handle)?;
                 }
@@ -221,6 +228,7 @@ fn handle_stt_shortcut(app_handle: &AppHandle, shortcut_state: ShortcutState) ->
         RecordingMode::PushToTalk => match shortcut_state {
             ShortcutState::Pressed => {
                 if current_status == crate::state::AppStatus::Idle {
+                    pause_system_media();
                     play_feedback_sound(app_handle, "start");
                     crate::commands::stt::do_start_recording(app_handle)?;
                 }

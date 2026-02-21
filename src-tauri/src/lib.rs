@@ -52,6 +52,7 @@ pub fn run() {
             commands::settings::rerun_onboarding,
             commands::settings::retry_stt_shortcut,
             commands::settings::check_microphone_permission,
+            commands::settings::request_microphone_permission,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

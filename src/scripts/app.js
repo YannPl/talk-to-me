@@ -110,6 +110,29 @@ document.getElementById('request-accessibility')?.addEventListener('click', asyn
     await api.requestAccessibilityPermission();
 });
 
+async function checkMicrophone() {
+    try {
+        const granted = await api.checkMicrophonePermission();
+        const statusEl = document.getElementById('microphone-status');
+        const btnEl = document.getElementById('request-microphone');
+        if (granted) {
+            statusEl.textContent = '\u2713 Microphone permission granted';
+            statusEl.classList.add('status-ok');
+            btnEl.style.display = 'none';
+        } else {
+            statusEl.textContent = '\u26A0 Microphone permission required';
+            statusEl.classList.add('status-warn');
+            btnEl.style.display = 'inline-block';
+        }
+    } catch (e) {
+        console.error('Failed to check microphone:', e);
+    }
+}
+
+document.getElementById('request-microphone')?.addEventListener('click', async () => {
+    await api.requestMicrophonePermission();
+});
+
 async function loadCatalog() {
     try {
         const catalog = await api.getCatalog('stt');
@@ -363,6 +386,7 @@ async function loadVersion() {
 document.addEventListener('DOMContentLoaded', () => {
     loadSettings();
     checkAccessibility();
+    checkMicrophone();
     loadCatalog();
     loadInstalled();
     loadVersion();
@@ -386,6 +410,10 @@ api.onPermissionMissing((data) => {
         text.textContent = 'Accessibility permission is disabled. Text will be copied to clipboard instead of typed.';
         btn.textContent = 'Open Preferences';
         btn.onclick = () => api.requestAccessibilityPermission();
+    } else if (data.permission === 'microphone') {
+        text.textContent = 'Microphone permission is disabled. Recording will not work.';
+        btn.textContent = 'Open Preferences';
+        btn.onclick = () => api.requestMicrophonePermission();
     }
     banner.style.display = 'flex';
 });

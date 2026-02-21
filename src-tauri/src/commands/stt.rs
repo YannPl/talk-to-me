@@ -406,12 +406,18 @@ pub async fn do_stop_recording(app_handle: &AppHandle) -> Result<String> {
     let injection_mode = {
         state.settings.lock().unwrap().stt.injection_mode.clone()
     };
+    let accessibility = injector.is_accessibility_granted();
+    tracing::info!(
+        "Text injection: mode={:?}, accessibility={}, text='{}'",
+        injection_mode, accessibility, result.text
+    );
 
     match injection_mode {
         crate::state::InjectionMode::Keystroke => {
-            if injector.is_accessibility_granted() {
+            if accessibility {
                 injector.inject_text(&result.text)?;
             } else {
+                tracing::warn!("Keystroke mode but no accessibility — falling back to clipboard-only");
                 injector.inject_via_clipboard(&result.text)?;
             }
         }
@@ -419,6 +425,8 @@ pub async fn do_stop_recording(app_handle: &AppHandle) -> Result<String> {
             injector.inject_via_clipboard(&result.text)?;
         }
     }
+
+    platform::get_media_controller().resume();
 
     {
         let mut status = state.status.lock().unwrap();
@@ -467,6 +475,8 @@ pub fn do_cancel_recording(app_handle: &AppHandle) -> Result<()> {
     {
         let _ = state.streaming_thread.lock().unwrap().take();
     }
+
+    platform::get_media_controller().resume();
 
     {
         let mut status = state.status.lock().unwrap();
